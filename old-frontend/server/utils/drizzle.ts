@@ -8,7 +8,7 @@ export const tables = schema
 const shouldLog = false
 
 export function useDrizzle() {
-    return drizzle('file:/home/toby/database.sqlite', { schema, logger: shouldLog })
+    return drizzle('file:/home/toby/data/database.sqlite', { schema, logger: shouldLog })
 }
 
 export type Home = typeof schema.homes.$inferSelect

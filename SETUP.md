@@ -34,9 +34,12 @@ Changes to be made from the raw raspberry pi lite image (most of this is done wi
 
 `git clone git@github.com:tobytwigger/bindicator`
 
+### Set up the database
+
+`mkdir /home/toby/data`
+`touch /home/toby/data/database.sqlite`
 
 
 3. STH AROUND download or copy script across (github?) that downloads and extracts the latest zip and runs setup.sh
    4. Simulated by copying entire repo except for gitattributes, frontend bar the output, and old-frontend
 4. Run setup.sh
-5. `touch /home/toby/database.sqlite`
