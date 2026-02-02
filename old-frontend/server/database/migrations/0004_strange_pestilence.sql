@@ -1,0 +1,1 @@
+ALTER TABLE `bins` ADD `position` integer NOT NULL;

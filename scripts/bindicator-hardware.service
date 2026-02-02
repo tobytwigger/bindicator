@@ -1,0 +1,12 @@
+[Unit]
+Description=Bindicator Hardware
+After=network.target
+
+[Service]
+User=pi
+WorkingDirectory=/home/pi/bindicator
+ExecStart=/home/pi/bindicator/.venv/bin/python /home/pi/bindicator/hardware/main.py
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

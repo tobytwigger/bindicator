@@ -1,0 +1,1 @@
+ALTER TABLE `homes` ADD `council_data` text;

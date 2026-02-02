@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX `bins_position_home_id_unique` ON `bins` (`position`,`home_id`);

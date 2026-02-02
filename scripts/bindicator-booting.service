@@ -1,0 +1,14 @@
+[Unit]
+Description=Set LCD to show booting message
+Before=basic.target
+After=local-fs.target sysinit.target
+DefaultDependencies=no
+
+[Service]
+User=pi
+Type=oneshot
+ExecStart=/home/pi/bindicator/.venv/bin/python /home/pi/bindicator/hardware/booting.py
+TimeoutSec=10
+
+[Install]
+WantedBy=multi-user.target

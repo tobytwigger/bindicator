@@ -1,0 +1,1 @@
+ALTER TABLE `homes` ADD `timeout` integer DEFAULT 180 NOT NULL;

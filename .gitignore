@@ -1,0 +1,18 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+frontend/node_modules
+old-frontend/node_modules
+old-frontend/.output
+old-frontend/.nuxt
+old-frontend/dist
+
+.idea

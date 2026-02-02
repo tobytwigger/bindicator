@@ -1,0 +1,1 @@
+ALTER TABLE `homes` ADD `active` integer DEFAULT false NOT NULL;
