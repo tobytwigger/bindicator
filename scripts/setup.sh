@@ -12,7 +12,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 cd "$(dirname "$0")/.."
 python3 -m venv .venv
 source .venv/bin/activate
-/home/pi/.local/bin/uv sync
+/home/toby/.local/bin/uv sync
 
 # 3. Setup Systemd Services
 sudo cp scripts/bindicator-api.service /etc/systemd/system/

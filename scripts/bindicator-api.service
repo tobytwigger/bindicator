@@ -3,9 +3,9 @@ Description=Bindicator API (FastAPI)
 After=network.target
 
 [Service]
-User=pi
-WorkingDirectory=/home/pi/bindicator
-ExecStart=/home/pi/bindicator/.venv/bin/python /home/pi/bindicator/.venv/bin/fastapi run /home/pi/bindicator/backend/main.py
+User=toby
+WorkingDirectory=/home/toby/bindicator
+ExecStart=/home/toby/bindicator/.venv/bin/python /home/toby/bindicator/.venv/bin/fastatoby run /home/toby/bindicator/backend/main.py
 Restart=always
 
 [Install]

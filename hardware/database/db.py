@@ -4,7 +4,7 @@ import os
 
 
 path = os.path.dirname(os.path.abspath(__file__))
-dbpath = os.path.join(path, '/home/pi/database.sqlite')
+dbpath = os.path.join(path, '/home/toby/database.sqlite')
 
 db = SqliteDatabase(dbpath)
 

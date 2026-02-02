@@ -3,9 +3,9 @@ Description=Bindicator Hardware
 After=network.target
 
 [Service]
-User=pi
-WorkingDirectory=/home/pi/bindicator
-ExecStart=/home/pi/bindicator/.venv/bin/python /home/pi/bindicator/hardware/main.py
+User=toby
+WorkingDirectory=/home/toby/bindicator
+ExecStart=/home/toby/bindicator/.venv/bin/python /home/toby/bindicator/hardware/main.py
 Restart=always
 
 [Install]

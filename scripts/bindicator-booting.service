@@ -5,9 +5,9 @@ After=local-fs.target sysinit.target
 DefaultDependencies=no
 
 [Service]
-User=pi
+User=toby
 Type=oneshot
-ExecStart=/home/pi/bindicator/.venv/bin/python /home/pi/bindicator/hardware/booting.py
+ExecStart=/home/toby/bindicator/.venv/bin/python /home/toby/bindicator/hardware/booting.py
 TimeoutSec=10
 
 [Install]
