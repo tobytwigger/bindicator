@@ -1,42 +1,26 @@
-from fastapi import Depends, FastAPI, HTTPException, Query
-from typing import Annotated
-from sqlmodel import Field, Session, SQLModel, create_engine, select
+from fastapi import FastAPI
+from routes import homes#, bins, schedules
+import sys
+from pathlib import Path
 
-class Home(SQLModel, table=True):
-    id: int = Field(default=None, primary_key=True)
-    name: str
+root_dir = Path(__file__).resolve().parents[2]
+sys.path.append(str(root_dir))
 
-sqlite_url = "sqlite+pysqlite:///home/toby/data/database.sqlite"
+app = FastAPI(
+    root_path="/api",
+    title="Bindicator API"
+)
 
-connect_args = {"check_same_thread": False}
-engine = create_engine(sqlite_url, connect_args=connect_args)
-
-
-def create_db_and_tables():
-    SQLModel.metadata.create_all(engine)
-
-
-def get_session():
-    with Session(engine) as session:
-        yield session
-
-SessionDep = Annotated[Session, Depends(get_session)]
-
-app = FastAPI()
+# Include the routers
+app.include_router(homes.router)
+# app.include_router(bins.router)
+# app.include_router(schedules.router)
 
 @app.get("/")
-def read_root():
-    return {"Hello": "World"}
+def root():
+    return {"message": "Hardware API is online"}
 
-@app.on_event("startup")
-def on_startup():
-    create_db_and_tables()
-
-@app.get("/home/")
-def read_home(
-    session: SessionDep,
-    offset: int = 0,
-    limit: Annotated[int, Query(le=100)] = 100,
-) -> list[Home]:
-    homes = session.exec(select(Home).offset(offset).limit(limit)).all()
-    return homes
+@app.post("/restart/")
+def restart_application():
+    # Run 'sudo systemctl restart bindicator-hardware.service'
+    subprocess.call(['sudo', 'systemctl', 'restart', 'bindicator-hardware.service'])

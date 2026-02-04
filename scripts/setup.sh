@@ -19,7 +19,8 @@ sudo cp scripts/bindicator-api.service /etc/systemd/system/
 sudo cp scripts/bindicator-hardware.service /etc/systemd/system/
 sudo cp scripts/bindicator-booting.service /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable --now bindicator-api bindicator-hardware bindicator-booting
+sudo systemctl enable --now bindicator-api bindicator-hardware
+sudo systemctl enable bindicator-booting
 
 # 4. Setup Nginx
 sudo cp scripts/bindicator.conf /etc/nginx/sites-available/
