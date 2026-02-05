@@ -15,8 +15,8 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 # Alembic Integration
-from database import Base
-from models import Home, Bin, Schedule, BinSchedule, BinDay, BinDayReplacement
+from database.database import Base
+from database.models import Bin, Schedule, BinDay, BinDayReplacement
 
 # add your model's MetaData object here
 # for 'autogenerate' support

@@ -3,17 +3,18 @@
         <template #header>
             <div class="flex justify-between">
                 <span class="flex flex-row items-center space-x-2">
-                    <h1>The Bindicator</h1>
+                    <div class="text-xl font-bold">The Bindicator</div>
                 </span>
                 <div class="flex space-x-2 flex-row">
-                    <UButton color="gray" label="Change Home" to="/home"/>
+                    <UButton color="neutral" label="Change Home" to="/home"/>
                     <ColorScheme>
                         <USelect v-model="$colorMode.preference" :options="['system', 'light', 'dark']"/>
                     </ColorScheme>
                 </div>
             </div>
             <div class="flex justify-between">
-                <UHorizontalNavigation :links="links" class="border-b border-gray-200 dark:border-gray-800"/>
+                HELLO
+                <UTabs :items="tabItems" v-model="activeTab" class="border-b border-gray-200 dark:border-gray-800" />
             </div>
         </template>
         <slot/>
@@ -21,6 +22,8 @@
     </UCard>
 </template>
 <script lang="ts" setup>
+import { ref, watch } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 
 const links = [{
     label: 'Bins',
@@ -35,4 +38,27 @@ const links = [{
     icon: 'i-heroicons-cog',
     to: '/settings'
 }]
+
+const tabItems = links.map(link => ({
+    label: link.label,
+    icon: link.icon
+}))
+
+const router = useRouter()
+const route = useRoute()
+const activeTab = ref(links.findIndex(link => link.to === route.path) !== -1 ? links.findIndex(link => link.to === route.path) : 0)
+
+watch(() => route.path, (newPath) => {
+    const idx = links.findIndex(link => link.to === newPath)
+    if (idx !== -1) activeTab.value = idx
+})
+
+watch(activeTab, onTabChange)
+
+function onTabChange(idx: number) {
+    if (links[idx] == undefined || links[idx].to === route.path) {
+        return
+    }
+    router.push(links[idx].to)
+}
 </script>

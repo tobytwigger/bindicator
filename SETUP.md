@@ -48,6 +48,10 @@ Changes to be made from the raw raspberry pi lite image (most of this is done wi
 
 This will install the required dependencies and services, and set up/start nginx
 
+May possibly need to make them executable first? Unsure if this persists along with the file.
+
+
+2. Add `user toby;` to the top of /etc/nginx/nginx.conf 
 3. STH AROUND download or copy script across (github?) that downloads and extracts the latest zip and runs setup.sh
    4. Simulated by copying entire repo except for gitattributes, frontend bar the output, and old-frontend
 4. Run setup.sh

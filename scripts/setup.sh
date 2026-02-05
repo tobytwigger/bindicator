@@ -11,6 +11,8 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 # 2. Setup Python Virtual Environment
 cd "$(dirname "$0")/.."
 python3 -m venv .venv
+
+# FROM HERE, we basically run an `update.sh`
 source .venv/bin/activate
 /home/toby/.local/bin/uv sync
 
