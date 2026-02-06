@@ -1,101 +1,59 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.orm import Session
 from core.database.database import get_db
-from core.database.schemas import Bin as BinSchema, BinCreate, BinEdit
+from core.database import schemas
+from core.database.repositories import BinDayReplacementRepository, PaginationOutOfRange
 from backend.utils.pagination import PaginationResponse
-from core.database.repositories import BinRepository, PaginationOutOfRange
 
 router = APIRouter(
-    prefix="/bin-day-replacements",
+    prefix="/bin_day_replacements",
     tags=["Bin Day Replacements"],
 )
 
-def get_bin_repo(db: Session = Depends(get_db)) -> BinRepository:
-    return BinRepository(db)
+def get_bin_day_replacement_repo(db: Session = Depends(get_db)) -> BinDayReplacementRepository:
+    return BinDayReplacementRepository(db)
 
-@router.get("/", response_model=PaginationResponse[BinSchema])
-def get_bins(
+@router.get("/", response_model=PaginationResponse[schemas.BinDayReplacement])
+def list_bin_day_replacements(
     page: int = Query(1, ge=1),
     per_page: int = Query(10, ge=1, le=100),
-    repo: BinRepository = Depends(get_bin_repo)
+    repo: BinDayReplacementRepository = Depends(get_bin_day_replacement_repo),
 ):
-    """
-    Get a paginated list of bins.
-    """
     try:
-        bins, total = repo.paginate(page, per_page)
+        items, total = repo.paginate(page, per_page)
     except PaginationOutOfRange:
         raise HTTPException(status_code=400, detail="Page out of range")
-    return PaginationResponse[BinSchema](
-        items=bins,
+    return PaginationResponse[
+        schemas.BinDayReplacement
+    ](
+        items=items,
         total=total,
         page=page,
         per_page=per_page
     )
 
-@router.get("/{bin_id}", response_model=BinSchema)
-def get_bin(bin_id: int, repo: BinRepository = Depends(get_bin_repo)):
-    """
-    Get a bin by its ID.
-    """
-    bin_obj = repo.get_by_id(bin_id)
-    if not bin_obj:
-        raise HTTPException(status_code=404, detail="Bin not found")
-    return bin_obj
+@router.get("/{replacement_id}", response_model=schemas.BinDayReplacement)
+def get_bin_day_replacement(replacement_id: int, repo: BinDayReplacementRepository = Depends(get_bin_day_replacement_repo)):
+    replacement = repo.get_by_id(replacement_id)
+    if not replacement:
+        raise HTTPException(status_code=404, detail="BinDayReplacement not found")
+    return replacement
 
-@router.post("/", response_model=BinSchema)
-def create_bin(bin: BinCreate, repo: BinRepository = Depends(get_bin_repo)):
-    """
-    Create a new bin.
-    """
-    return repo.create(bin)
+@router.post("/", response_model=schemas.BinDayReplacement)
+def create_bin_day_replacement(replacement: schemas.BinDayReplacementCreate, repo: BinDayReplacementRepository = Depends(get_bin_day_replacement_repo)):
+    created = repo.create(replacement)
+    return created
 
-@router.post("/{bin_id}/move-earlier", response_model=BinSchema)
-def move_bin_earlier(bin_id: int, repo: BinRepository = Depends(get_bin_repo)):
-    """
-    Move a bin earlier in the order.
-    """
-    bin_obj = repo.move_bin_earlier(bin_id)
-    if not bin_obj:
-        raise HTTPException(status_code=400, detail="Cannot move bin earlier")
-    return bin_obj
+@router.patch("/{replacement_id}", response_model=schemas.BinDayReplacement)
+def edit_bin_day_replacement(replacement_id: int, replacement_edit: dict, repo: BinDayReplacementRepository = Depends(get_bin_day_replacement_repo)):
+    updated = repo.edit(replacement_id, replacement_edit)
+    if not updated:
+        raise HTTPException(status_code=404, detail="BinDayReplacement not found")
+    return updated
 
-@router.post("/{bin_id}/move-later", response_model=BinSchema)
-def move_bin_later(bin_id: int, repo: BinRepository = Depends(get_bin_repo)):
-    """
-    Move a bin later in the order.
-    """
-    bin_obj = repo.move_bin_later(bin_id)
-    if not bin_obj:
-        raise HTTPException(status_code=400, detail="Cannot move bin later")
-    return bin_obj
-
-@router.post("/{bin_id}/set-position", response_model=BinSchema)
-def set_bin_position(bin_id: int, position: int = Query(..., ge=1), repo: BinRepository = Depends(get_bin_repo)):
-    """
-    Set the position of a bin.
-    """
-    bin_obj = repo.set_bin_position(bin_id, position)
-    if not bin_obj:
-        raise HTTPException(status_code=400, detail="Cannot set bin position")
-    return bin_obj
-
-@router.patch("/{bin_id}", response_model=BinSchema)
-def edit_bin(bin_id: int, bin_edit: BinEdit, repo: BinRepository = Depends(get_bin_repo)):
-    """
-    Edit a bin's name and colour.
-    """
-    bin_obj = repo.edit_bin(bin_id, bin_edit.name, bin_edit.colour)
-    if not bin_obj:
-        raise HTTPException(status_code=404, detail="Bin not found")
-    return bin_obj
-
-@router.delete("/{bin_id}", response_model=dict)
-def delete_bin(bin_id: int, repo: BinRepository = Depends(get_bin_repo)):
-    """
-    Delete a bin by its ID.
-    """
-    success = repo.delete_bin(bin_id)
-    if not success:
-        raise HTTPException(status_code=404, detail="Bin not found")
-    return {"status": "success"}
+@router.delete("/{replacement_id}", status_code=204)
+def delete_bin_day_replacement(replacement_id: int, repo: BinDayReplacementRepository = Depends(get_bin_day_replacement_repo)):
+    deleted = repo.delete(replacement_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="BinDayReplacement not found")
+    return Response(status_code=204)

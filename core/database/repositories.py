@@ -185,3 +185,63 @@ class ScheduleRepository:
         self.db.delete(db_schedule)
         self.db.commit()
         return True
+
+class BinDayReplacementRepository:
+    def __init__(self, db: Session):
+        self.db = db
+
+    def _parse_datetime(self, value):
+        if value is None:
+            return None
+        if isinstance(value, datetime):
+            return value
+        if isinstance(value, str):
+            try:
+                return datetime.strptime(value, "%Y-%m-%d")
+            except ValueError:
+                return datetime.strptime(value, "%Y-%m-%dT%H:%M:%S")
+        return value
+
+    def paginate(self, page: int, per_page: int) -> tuple[list[schemas.BinDayReplacement], int]:
+        query = self.db.query(models.BinDayReplacement).order_by(models.BinDayReplacement.id)
+        total = query.count()
+        if page > 1 and (page - 1) * per_page >= total:
+            raise PaginationOutOfRange()
+        replacements = query.offset((page - 1) * per_page).limit(per_page).all()
+        return [schemas.BinDayReplacement.model_validate(r) for r in replacements], total
+
+    def get_by_id(self, replacement_id: int) -> Optional[schemas.BinDayReplacement]:
+        db_replacement = self.db.query(models.BinDayReplacement).filter(models.BinDayReplacement.id == replacement_id).first()
+        if not db_replacement:
+            return None
+        return schemas.BinDayReplacement.model_validate(db_replacement)
+
+    def create(self, replacement_data: schemas.BinDayReplacementCreate) -> schemas.BinDayReplacement:
+        db_replacement = models.BinDayReplacement(
+            replace=replacement_data.replace,
+            replace_with=replacement_data.replace_with
+        )
+        self.db.add(db_replacement)
+        self.db.commit()
+        self.db.refresh(db_replacement)
+        return schemas.BinDayReplacement.model_validate(db_replacement)
+
+    def edit(self, replacement_id: int, replacement_edit: dict) -> Optional[schemas.BinDayReplacement]:
+        db_replacement = self.db.query(models.BinDayReplacement).filter(models.BinDayReplacement.id == replacement_id).first()
+        if not db_replacement:
+            return None
+        if 'replace' in replacement_edit and replacement_edit['replace'] is not None:
+            db_replacement.replace = self._parse_datetime(replacement_edit['replace'])
+        if 'replace_with' in replacement_edit and replacement_edit['replace_with'] is not None:
+            db_replacement.replace_with = self._parse_datetime(replacement_edit['replace_with'])
+        self.db.commit()
+        self.db.refresh(db_replacement)
+        return schemas.BinDayReplacement.model_validate(db_replacement)
+
+    def delete(self, replacement_id: int) -> bool:
+        db_replacement = self.db.query(models.BinDayReplacement).filter(models.BinDayReplacement.id == replacement_id).first()
+        if not db_replacement:
+            return False
+        self.db.delete(db_replacement)
+        self.db.commit()
+        return True

@@ -307,8 +307,7 @@ class TestBinsDelete:
         db.commit()
         bin1 = create_bin(client, db, "Bin1", 1)
         response = client.delete(f"/bins/{bin1.id}")
-        assert response.status_code == 200
-        assert response.json()["status"] == "success"
+        assert response.status_code == 204
 
     def test_delete_bin_404(self, client, db):
         response = client.delete("/bins/999")
@@ -325,6 +324,6 @@ class TestBinsDelete:
         assert db.query(Schedule).filter(Schedule.bin_id == bin.id).count() == 2
         # Delete the bin
         response = client.delete(f"/bins/{bin.id}")
-        assert response.status_code == 200
+        assert response.status_code == 204
         # Schedules should be deleted
         assert db.query(Schedule).filter(Schedule.bin_id == bin.id).count() == 0

@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from core.database.database import get_db
 from core.database import schemas
 from core.database.repositories import ScheduleRepository, PaginationOutOfRange
+from backend.utils.pagination import PaginationResponse
 
 # Define the router
 router = APIRouter(
@@ -13,7 +14,7 @@ router = APIRouter(
 def get_schedule_repo(db: Session = Depends(get_db)) -> ScheduleRepository:
     return ScheduleRepository(db)
 
-@router.get("/", response_model=dict)
+@router.get("/", response_model=PaginationResponse[schemas.Schedule])
 def list_schedules(
     page: int = Query(1, ge=1),
     per_page: int = Query(10, ge=1, le=100),
@@ -26,12 +27,14 @@ def list_schedules(
         items, total = repo.paginate(page, per_page)
     except PaginationOutOfRange:
         raise HTTPException(status_code=400, detail="Page out of range")
-    return {
-        "items": items,
-        "total": total,
-        "page": page,
-        "per_page": per_page
-    }
+    return PaginationResponse[
+        schemas.Schedule
+    ](
+        items=items,
+        total=total,
+        page=page,
+        per_page=per_page
+    )
 
 
 @router.get("/{schedule_id}", response_model=schemas.Schedule)
