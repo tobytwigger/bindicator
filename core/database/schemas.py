@@ -55,6 +55,16 @@ class ScheduleCreate(ScheduleBase):
     pass
 
 
+class ScheduleEdit(BaseModel):
+    start: Optional[datetime] = None
+    end: Optional[datetime] = None
+    bin_id: Optional[int] = None
+    repeat_weeks: Optional[int] = None
+    model_config = {
+        "from_attributes": True,
+    }
+
+
 class Schedule(ScheduleBase):
     id: int
     created_at: datetime

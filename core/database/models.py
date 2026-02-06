@@ -14,7 +14,7 @@ class Bin(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
-    schedules = relationship("Schedule", back_populates="bin")
+    schedules = relationship("Schedule", back_populates="bin", cascade="all, delete-orphan")
 
 class Schedule(Base):
     __tablename__ = "schedules"

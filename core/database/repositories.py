@@ -2,6 +2,7 @@ from sqlalchemy.orm import Session
 from typing import Optional
 from core.database import models, schemas
 from sqlalchemy import func
+from datetime import datetime
 
 class PaginationOutOfRange(Exception):
     pass
@@ -111,3 +112,68 @@ class BinRepository:
         for idx, bin_obj in enumerate(bins):
             bin_obj.position = idx + 1
         self.db.commit()
+
+class ScheduleRepository:
+    def __init__(self, db: Session):
+        self.db = db
+
+    def _parse_datetime(self, value):
+        if value is None:
+            return None
+        if isinstance(value, datetime):
+            return value
+        if isinstance(value, str):
+            try:
+                return datetime.strptime(value, "%Y-%m-%d")
+            except ValueError:
+                return datetime.strptime(value, "%Y-%m-%dT%H:%M:%S")
+        return value
+
+    def paginate(self, page: int, per_page: int) -> tuple[list[schemas.Schedule], int]:
+        query = self.db.query(models.Schedule).order_by(models.Schedule.id)
+        total = query.count()
+        if page > 1 and (page - 1) * per_page >= total:
+            raise PaginationOutOfRange()
+        schedules = query.offset((page - 1) * per_page).limit(per_page).all()
+        return [schemas.Schedule.model_validate(s) for s in schedules], total
+
+    def get_by_id(self, schedule_id: int) -> Optional[schemas.Schedule]:
+        db_schedule = self.db.query(models.Schedule).filter(models.Schedule.id == schedule_id).first()
+        if not db_schedule:
+            return None
+        return schemas.Schedule.model_validate(db_schedule)
+
+    def create(self, schedule_data: schemas.ScheduleCreate) -> schemas.Schedule:
+        # Check bin exists
+        bin = self.db.query(models.Bin).filter(models.Bin.id == schedule_data.bin_id).first()
+        if not bin:
+            raise ValueError("Bin not found")
+        db_schedule = models.Schedule(
+            start=self._parse_datetime(schedule_data.start),
+            end=self._parse_datetime(schedule_data.end) if schedule_data.end else None,
+            repeat_weeks=schedule_data.repeat_weeks,
+            bin_id=schedule_data.bin_id
+        )
+        self.db.add(db_schedule)
+        self.db.commit()
+        self.db.refresh(db_schedule)
+        return schemas.Schedule.model_validate(db_schedule)
+
+    def edit(self, schedule_id: int, schedule_edit: schemas.ScheduleEdit) -> Optional[schemas.Schedule]:
+        db_schedule = self.db.query(models.Schedule).filter(models.Schedule.id == schedule_id).first()
+        if not db_schedule:
+            return None
+        if schedule_edit.start is not None:
+            db_schedule.start = self._parse_datetime(schedule_edit.start)
+        if schedule_edit.end is not None:
+            db_schedule.end = self._parse_datetime(schedule_edit.end)
+        if schedule_edit.repeat_weeks is not None:
+            db_schedule.repeat_weeks = schedule_edit.repeat_weeks
+        if schedule_edit.bin_id is not None:
+            bin = self.db.query(models.Bin).filter(models.Bin.id == schedule_edit.bin_id).first()
+            if not bin:
+                raise ValueError("Bin not found")
+            db_schedule.bin_id = schedule_edit.bin_id
+        self.db.commit()
+        self.db.refresh(db_schedule)
+        return schemas.Schedule.model_validate(db_schedule)

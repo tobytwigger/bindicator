@@ -1,15 +1,28 @@
 import sys
 from pathlib import Path
+from datetime import datetime
 
 root_dir = Path(__file__).resolve().parents[2]
 sys.path.append(str(root_dir))
 
 import pytest
-from core.database.models import Bin
+from core.database.models import Bin, Schedule
 from backend.tests.test_db import db, client
 
 
 # Helper to create bins
+def parse_datetime(value):
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value
+    if isinstance(value, str):
+        try:
+            return datetime.strptime(value, "%Y-%m-%d")
+        except ValueError:
+            return datetime.strptime(value, "%Y-%m-%dT%H:%M:%S")
+    return value
+
 
 def create_bin(client, db, name, position, colour=None):
     bin = Bin(name=name, position=position, colour=colour)
@@ -17,6 +30,17 @@ def create_bin(client, db, name, position, colour=None):
     db.commit()
     db.refresh(bin)
     return bin
+
+
+def create_schedule(client, db, start, repeat_weeks, bin_id, end=None):
+    start_dt = parse_datetime(start)
+    end_dt = parse_datetime(end) if end else None
+    schedule = Schedule(start=start_dt, repeat_weeks=repeat_weeks, bin_id=bin_id, end=end_dt)
+    db.add(schedule)
+    db.commit()
+    db.refresh(schedule)
+    return schedule
+
 
 class TestBinsList:
     def test_list_bins_returns_all_bins(self, client, db):
@@ -289,3 +313,18 @@ class TestBinsDelete:
     def test_delete_bin_404(self, client, db):
         response = client.delete("/bins/999")
         assert response.status_code == 404
+
+    def test_schedules_deleted_with_bin(self, client, db):
+        db.query(Schedule).delete()
+        db.query(Bin).delete()
+        db.commit()
+        bin = create_bin(client, db, name="TestBin", position=1)
+        sched1 = create_schedule(client, db, "2024-01-01", 2, bin.id)
+        sched2 = create_schedule(client, db, "2024-02-01", 3, bin.id)
+        # Confirm schedules exist
+        assert db.query(Schedule).filter(Schedule.bin_id == bin.id).count() == 2
+        # Delete the bin
+        response = client.delete(f"/bins/{bin.id}")
+        assert response.status_code == 200
+        # Schedules should be deleted
+        assert db.query(Schedule).filter(Schedule.bin_id == bin.id).count() == 0
