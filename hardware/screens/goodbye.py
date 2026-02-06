@@ -1,4 +1,4 @@
-from screens.abstract_screen import Screen
+from hardware.screens.abstract_screen import Screen
 from schedule import Scheduler, CancelJob
 import time
 

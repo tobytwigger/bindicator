@@ -1,22 +1,27 @@
 #!/home/toby/when-is-bins/python/.venv/bin/python
+import sys
+from pathlib import Path
+
+root_dir = Path(__file__).resolve().parents[1]
+sys.path.append(str(root_dir))
 
 import RPi.GPIO as GPIO
 import time
 import signal
 import schedule
-from drivers.lcd import Lcd
-from drivers.lights import Lights, LightState
-from drivers.movement import Movement
+from hardware.drivers.lcd import Lcd
+from hardware.drivers.lights import Lights, LightState
+from hardware.drivers.movement import Movement
 import threading
-from drivers.buttons import Buttons
-from drivers.drivers import Drivers
-from drivers.inputs import Inputs
-from config.config import ConfigRepository
-from screens.check_configuration import ConfigurationChecker, CheckConfiguration
-from screens.goodbye import GoodbyeScreen
-from screens.error import ErrorScreen
-from screens.welcome import WelcomeScreen
-from screens.abstract_screen import Screen
+from hardware.drivers.buttons import Buttons
+from hardware.drivers.drivers import Drivers
+from hardware.drivers.inputs import Inputs
+from hardware.config.config import ConfigRepository
+from hardware.screens.check_configuration import ConfigurationChecker, CheckConfiguration
+from hardware.screens.goodbye import GoodbyeScreen
+from hardware.screens.error import ErrorScreen
+from hardware.screens.welcome import WelcomeScreen
+from hardware.screens.abstract_screen import Screen
 import logging
 
 should_kill = False

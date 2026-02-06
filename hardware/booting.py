@@ -1,5 +1,5 @@
 import RPi.GPIO as GPIO
-from drivers.lcd import Lcd
+from hardware.drivers.lcd import Lcd
 import time
 
 def run():

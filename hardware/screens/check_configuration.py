@@ -1,8 +1,8 @@
-from screens.abstract_screen import Screen
+from hardware.screens.abstract_screen import Screen
 from schedule import Scheduler, CancelJob
-from database.db import Home
-from screens.loading_bin_day import LoadingBinDay
-from drivers.drivers import Drivers
+from hardware.database.db import Home
+from hardware.screens.loading_bin_day import LoadingBinDay
+from hardware.drivers.drivers import Drivers
 
 
 class CheckConfiguration(Screen):

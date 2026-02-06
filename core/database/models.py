@@ -2,7 +2,8 @@
 
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, UniqueConstraint, JSON
 from sqlalchemy.orm import relationship
-from database.database import Base
+from core.database.database import Base
+from sqlalchemy.sql import func
 
 class Bin(Base):
     __tablename__ = "bins"
@@ -10,8 +11,9 @@ class Bin(Base):
     name = Column(String, nullable=False)
     position = Column(Integer, nullable=False)
     colour = Column(String)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
-    __table_args__ = (UniqueConstraint('position', name='_position_uc'),)
     schedules = relationship("Schedule", back_populates="bin")
 
 class Schedule(Base):
@@ -24,16 +26,14 @@ class Schedule(Base):
 
     bin = relationship("Bin", back_populates="schedules")
 
-class BinDay(Base):
-    __tablename__ = "bin_days"
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    bin_id = Column(Integer, ForeignKey("bins.id"), nullable=False)
-    date = Column(DateTime, nullable=False)
-    schedule_id = Column(Integer, ForeignKey("schedules.id"))
-    put_out_at = Column(DateTime)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
 class BinDayReplacement(Base):
     __tablename__ = "bin_day_replacements"
     id = Column(Integer, primary_key=True, autoincrement=True)
     replace = Column(DateTime)
     replace_with = Column(DateTime, nullable=False)
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

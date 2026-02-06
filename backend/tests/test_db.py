@@ -3,7 +3,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 from fastapi.testclient import TestClient
-from database.database import Base, get_db
+from core.database.database import Base, get_db
 from backend.main import app
 
 # Use an in-memory SQLite database for testing

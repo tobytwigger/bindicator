@@ -1,6 +1,6 @@
-from screens.abstract_screen import Screen
+from hardware.screens.abstract_screen import Screen
 from schedule import Scheduler, CancelJob
-from screens.check_configuration import CheckConfiguration
+from hardware.screens.check_configuration import CheckConfiguration
 
 # Shows a welcome message for 2 seconds
 class WelcomeScreen(Screen):

@@ -1,7 +1,7 @@
-from drivers.buttons import Buttons
-from drivers.movement import Movement
+from hardware.drivers.buttons import Buttons
+from hardware.drivers.movement import Movement
 import time
-from drivers.drivers import Drivers
+from hardware.drivers.drivers import Drivers
 from enum import Enum
 import time
 

@@ -1,13 +1,13 @@
-from drivers.lights import LightState
-from screens.abstract_screen import Screen
+from hardware.drivers.lights import LightState
+from hardware.screens.abstract_screen import Screen
 from schedule import Scheduler, CancelJob
-from database.db import Home, Bin, BinDay
-from data.bins import BinDayRepository
-from drivers.inputs import InputEvents
+from hardware.database.db import Home, Bin, BinDay
+from hardware.data.bins import BinDayRepository
+from hardware.drivers.inputs import InputEvents
 import datetime
 from playhouse.shortcuts import model_to_dict, dict_to_model
-from utils.date_format import format_date
-from utils.state import ValueChangeNotifier, ScreenUsingState, State
+from hardware.utils.date_format import format_date
+from hardware.utils.state import ValueChangeNotifier, ScreenUsingState, State
 
 
 class Today(ScreenUsingState):
@@ -90,14 +90,14 @@ class Today(ScreenUsingState):
         bins_are_due = False
         if date == datetime.date.today():
             bins_are_due = True
-        elif date == datetime.date.today() + datetime.timedelta(days=1) and self._state.home.value.put_out_day_before:
+        elif date == datetime.date.today() + datetime.timedelta(days=1) and getattr(self._state.home.value, "put_out_day_before", True):
             bins_are_due = True
 
         currently_due_bins = {}
 
         for b in bins.bins:
             # TODO Check if bin has been taken out already
-            is_due_out = bins_are_due and b.is_taken_out is False
+            is_due_out = bins_are_due and getattr(b, "is_taken_out", False) is False
             if is_due_out:
                 currently_due_bins[b.position] = b
             bin_state[b.position - 1] = LightState.PHASE if is_due_out else LightState.ON

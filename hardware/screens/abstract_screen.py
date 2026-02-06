@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from schedule import Scheduler
 
-from drivers.inputs import InputEvents
+from hardware.drivers.inputs import InputEvents
 
 
 class Screen(ABC):

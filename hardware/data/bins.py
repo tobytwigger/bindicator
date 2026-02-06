@@ -2,9 +2,9 @@ import datetime
 from uk_bin_collection.uk_bin_collection.collect_data import UKBinCollectionApp
 from dataclasses import dataclass
 import json
-from database.db import Home, Bin, BinDay, Schedule, BinSchedule
+from hardware.database.db import Home, Bin, BinDay, Schedule, BinSchedule
 
-from data.selenium import SeleniumDriverManager
+from hardware.data.selenium import SeleniumDriverManager
 
 
 
