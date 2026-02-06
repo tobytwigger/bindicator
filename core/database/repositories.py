@@ -177,3 +177,11 @@ class ScheduleRepository:
         self.db.commit()
         self.db.refresh(db_schedule)
         return schemas.Schedule.model_validate(db_schedule)
+
+    def delete(self, schedule_id: int) -> bool:
+        db_schedule = self.db.query(models.Schedule).filter(models.Schedule.id == schedule_id).first()
+        if not db_schedule:
+            return False
+        self.db.delete(db_schedule)
+        self.db.commit()
+        return True

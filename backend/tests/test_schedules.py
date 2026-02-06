@@ -216,3 +216,36 @@ class TestSchedulesUpdate:
         response = client.patch(f"/schedules/{sched.id}", json=payload)
         assert response.status_code == 422
 
+class TestSchedulesDelete:
+    def test_delete_schedule_success(self, client, db):
+        db.query(Schedule).delete()
+        db.query(Bin).delete()
+        db.commit()
+        bin = create_bin(client, db)
+        sched = create_schedule(client, db, "2024-01-01", 2, bin.id)
+        response = client.delete(f"/schedules/{sched.id}")
+        assert response.status_code == 204
+        # Confirm schedule is gone
+        response2 = client.get(f"/schedules/{sched.id}")
+        assert response2.status_code == 404
+
+    def test_delete_schedule_not_found(self, client, db):
+        db.query(Schedule).delete()
+        db.commit()
+        response = client.delete("/schedules/99999")
+        assert response.status_code == 404
+
+    def test_bin_persists_after_schedule_deleted(self, client, db):
+        db.query(Schedule).delete()
+        db.query(Bin).delete()
+        db.commit()
+        bin = create_bin(client, db)
+        bin_id = bin.id  # Store ID before session closes
+        sched = create_schedule(client, db, "2024-01-01", 2, bin_id)
+        response = client.delete(f"/schedules/{sched.id}")
+        assert response.status_code == 204
+        # Bin should still exist, fetch via API
+        response2 = client.get(f"/bins/{bin_id}")
+        assert response2.status_code == 200
+        data = response2.json()
+        assert data["id"] == bin_id

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from core.database.database import get_db
 from core.database.schemas import Bin as BinSchema, BinCreate, BinEdit
@@ -6,8 +6,8 @@ from backend.utils.pagination import PaginationResponse
 from core.database.repositories import BinRepository, PaginationOutOfRange
 
 router = APIRouter(
-    prefix="/bins",
-    tags=["Bins"],
+    prefix="/bin-day-replacements",
+    tags=["Bin Day Replacements"],
 )
 
 def get_bin_repo(db: Session = Depends(get_db)) -> BinRepository:
@@ -90,7 +90,7 @@ def edit_bin(bin_id: int, bin_edit: BinEdit, repo: BinRepository = Depends(get_b
         raise HTTPException(status_code=404, detail="Bin not found")
     return bin_obj
 
-@router.delete("/{bin_id}", status_code=204)
+@router.delete("/{bin_id}", response_model=dict)
 def delete_bin(bin_id: int, repo: BinRepository = Depends(get_bin_repo)):
     """
     Delete a bin by its ID.
@@ -98,4 +98,4 @@ def delete_bin(bin_id: int, repo: BinRepository = Depends(get_bin_repo)):
     success = repo.delete_bin(bin_id)
     if not success:
         raise HTTPException(status_code=404, detail="Bin not found")
-    return Response(status_code=204)
+    return {"status": "success"}

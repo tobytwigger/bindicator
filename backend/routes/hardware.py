@@ -3,7 +3,7 @@ import subprocess
 
 router = APIRouter(
     prefix="/hardware",
-    tags=["hardware"],
+    tags=["Hardware"],
 )
 
 @router.post("/restart/")
