@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from backend.routes import bins, hardware
+from backend.routes import bins, hardware, schedules
 import sys
 from pathlib import Path
 
@@ -15,5 +15,5 @@ app = FastAPI(
 app.include_router(bins.router)
 app.include_router(hardware.router)
 # app.include_router(bins.router)
-# app.include_router(schedules.router)
+app.include_router(schedules.router)
 

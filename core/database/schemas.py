@@ -30,8 +30,9 @@ class BinCreate(BinBase):
 class BinEdit(BaseModel):
     name: Optional[str] = None
     colour: Optional[str] = None
-    class Config:
-        from_attributes = True
+    model_config = {
+        "from_attributes": True,
+    }
 
 class Bin(BinBase):
     id: int
@@ -39,8 +40,9 @@ class Bin(BinBase):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True # In Pydantic v2 (replaces orm_mode=True)
+    model_config = {
+        "from_attributes": True,
+    }
 
 
 class ScheduleBase(BaseModel):
@@ -58,8 +60,9 @@ class Schedule(ScheduleBase):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True  # In Pydantic v2 (replaces orm_mode=True)
+    model_config = {
+        "from_attributes": True,
+    }
 
 class BinDayReplacementBase(BaseModel):
     replace: datetime
@@ -73,5 +76,6 @@ class BinDayReplacement(BinDayReplacementBase):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True  # In Pydantic v2 (replaces orm_mode=True)
+    model_config = {
+        "from_attributes": True,
+    }
