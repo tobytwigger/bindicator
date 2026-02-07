@@ -1,5 +1,11 @@
+from hardware.drivers.buttons import Buttons
+from hardware.drivers.lcd import Lcd
+from hardware.drivers.lights import Lights
+from hardware.drivers.movement import Movement
+
+
 class Drivers:
-    def __init__(self, lcd, lights, movement, buttons):
+    def __init__(self, lcd: Lcd, lights: Lights, movement: Movement, buttons: Buttons):
         self.lcd = lcd
         self.lights = lights
         self.buttons = buttons

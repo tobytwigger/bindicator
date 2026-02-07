@@ -17,7 +17,6 @@ from hardware.drivers.buttons import Buttons
 from hardware.drivers.drivers import Drivers
 from hardware.drivers.inputs import Inputs
 from hardware.config.config import ConfigRepository
-from hardware.screens.check_configuration import ConfigurationChecker, CheckConfiguration
 from hardware.screens.goodbye import GoodbyeScreen
 from hardware.screens.error import ErrorScreen
 from hardware.screens.welcome import WelcomeScreen
@@ -144,11 +143,11 @@ class AppRunner:
                             screen.handle_input(event)
 
                     # Redirect to the config page if config is not valid
-                    if self._redirect_to_config and not screen is None and not isinstance(screen, CheckConfiguration):
-                        self._redirect_to_config = False
-                        self._cleanup(screen)
-                        screen = CheckConfiguration()
-                        break
+                    # if self._redirect_to_config and not screen is None and not isinstance(screen, CheckConfiguration):
+                    #     self._redirect_to_config = False
+                    #     self._cleanup(screen)
+                    #     screen = CheckConfiguration()
+                    #     break
 
                     # Tick the screen
                     screen.tick(self._drivers)
@@ -166,10 +165,11 @@ class AppRunner:
 
 
     def _check_configuration(self):
-        checker = ConfigurationChecker()
-        result = checker.validate()
-        if not result.is_valid():
-            self._redirect_to_config = True
+        pass
+        # checker = ConfigurationChecker()
+        # result = checker.validate()
+        # if not result.is_valid():
+        #     self._redirect_to_config = True
 
     def _check_settings(self):
         self._inputs._movement_timeout = ConfigRepository().get().timeout

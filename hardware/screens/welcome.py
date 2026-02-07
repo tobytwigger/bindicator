@@ -1,7 +1,7 @@
 from hardware.drivers.drivers import Drivers
 from hardware.screens.abstract_screen import Screen
 from schedule import Scheduler, CancelJob
-from hardware.screens.check_configuration import CheckConfiguration
+
 
 # Shows a welcome message for 2 seconds
 class WelcomeScreen(Screen):
@@ -18,6 +18,8 @@ class WelcomeScreen(Screen):
 
     def tick(self, drivers):
         if self._finish_booting:
-            return CheckConfiguration()
+            from hardware.screens.today import Today
+
+            return Today()
 
         return None

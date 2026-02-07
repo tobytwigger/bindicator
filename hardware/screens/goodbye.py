@@ -1,20 +1,22 @@
-from hardware.screens.abstract_screen import Screen
+from hardware.drivers.drivers import Drivers
+from hardware.screens.abstract_screen import Screen, QuitApp
 from schedule import Scheduler, CancelJob
-import time
+
 
 class GoodbyeScreen(Screen):
     def __init__(self):
         self._finish_saying_bye = False
 
-    def schedule(self, schedule: Scheduler):
+    def on_enter(self, schedule: Scheduler, drivers: Drivers):
+        drivers.lcd.display('Goodbye', '', drivers.lcd.TEXT_STYLE_CENTER)
         schedule.every(2).seconds.do(self._finish_closing_app)
 
     def _finish_closing_app(self):
         self._finish_saying_bye = True
         return CancelJob
 
-    def show_initial_state(self, drivers):
-        drivers.lcd.display('Goodbye', '', drivers.lcd.TEXT_STYLE_CENTER)
+    def tick(self, drivers) -> Screen | None | QuitApp:
+        if self._finish_saying_bye:
+            return QuitApp()
 
-    def should_quit(self):
-        return self._finish_saying_bye
+        return None

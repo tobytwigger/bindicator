@@ -67,7 +67,7 @@ class Lcd:
         self._current_line_2 = line2
         self._lcd.clear()
         self._lcd.cursor_mode = 'hide'
-        print('called')
+
         if len(line1) > self.LCD_WIDTH or len(line2) > self.LCD_WIDTH:
             self._scrolling_thread = Thread(target=self._display_scrolling, args=(line1, line2, prefix, suffix))
             self._scrolling_thread.start()

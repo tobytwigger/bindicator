@@ -1,9 +1,10 @@
-from abc import ABC, abstractmethod
-from schedule import Scheduler
 from __future__ import annotations
+from abc import ABC, abstractmethod
+from typing import List
+
+from schedule import Scheduler
 from hardware.drivers.drivers import Drivers
 from hardware.drivers.inputs import InputEvents
-from hardware.main import QuitApp
 
 
 class Screen(ABC):
@@ -13,5 +14,8 @@ class Screen(ABC):
     def tick(self, drivers) -> Screen | None | QuitApp:
         pass
 
-    def handle_input(self, event: InputEvents):
+    def handle_inputs(self, events: List[InputEvents], drivers: Drivers):
         pass
+
+class QuitApp:
+    pass

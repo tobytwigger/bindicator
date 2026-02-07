@@ -2,11 +2,10 @@
 import sys
 from pathlib import Path
 
-from hardware.screens.check_configuration import ConfigurationChecker, CheckConfiguration
-
 root_dir = Path(__file__).resolve().parents[1]
 sys.path.append(str(root_dir))
 
+from hardware.screens.error import ErrorScreen
 import RPi.GPIO as GPIO
 import signal
 from hardware.drivers.lcd import Lcd
@@ -14,7 +13,6 @@ from hardware.drivers.lights import Lights
 from hardware.drivers.movement import Movement
 from hardware.drivers.buttons import Buttons
 from hardware.screens.goodbye import GoodbyeScreen
-from hardware.screens.error import ErrorScreen
 from hardware.screens.welcome import WelcomeScreen
 import logging
 import time
@@ -23,9 +21,7 @@ import threading
 from hardware.drivers.drivers import Drivers
 from hardware.drivers.inputs import Inputs
 from hardware.config.config import ConfigRepository
-from hardware.screens.check_configuration import ConfigurationChecker, CheckConfiguration
-from hardware.screens.abstract_screen import Screen
-
+from hardware.screens.abstract_screen import Screen, QuitApp
 
 should_kill = False
 
@@ -68,9 +64,6 @@ def run():
 def set_up_gpio():
     GPIO.setmode(GPIO.BCM)
     GPIO.setwarnings(False)
-
-class QuitApp:
-    pass
 
 class AppRunner:
     def __init__(self, drivers: Drivers, inputs: Inputs):
@@ -142,15 +135,25 @@ class AppRunner:
 
                     # Pass the events to the screen
                     if len(events) > 0:
-                        for event in events:
-                            screen.handle_input(event)
+                        result = screen.handle_inputs(events, self._drivers)
+
+                        # Check if the app should quit
+                        if should_kill or isinstance(result, QuitApp):
+                            screen = None
+                            break
+
+                        # Check if a redirect is needed
+                        if isinstance(result, Screen):
+                            self._cleanup()
+                            screen = result
+                            break  # Break inner loop to transition to next_screen
 
                     # Redirect to the config page if config is not valid
-                    if self._redirect_to_config and screen is not None and not isinstance(screen, CheckConfiguration):
-                        self._redirect_to_config = False
-                        self._cleanup()
-                        screen = CheckConfiguration()
-                        break
+                    # if self._redirect_to_config and screen is not None and not isinstance(screen, CheckConfiguration):
+                    #     self._redirect_to_config = False
+                    #     self._cleanup()
+                    #     screen = CheckConfiguration()
+                    #     break
 
                     time.sleep(0.08)
 
@@ -167,10 +170,11 @@ class AppRunner:
 
 
     def _check_configuration(self):
-        checker = ConfigurationChecker()
-        result = checker.validate()
-        if not result.is_valid():
-            self._redirect_to_config = True
+        pass
+        # checker = ConfigurationChecker()
+        # result = checker.validate()
+        # if not result.is_valid():
+        #     self._redirect_to_config = True
 
     def _check_settings(self):
         self._inputs._movement_timeout = ConfigRepository().get().timeout
