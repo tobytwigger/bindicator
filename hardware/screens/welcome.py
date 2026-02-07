@@ -1,3 +1,4 @@
+from hardware.drivers.drivers import Drivers
 from hardware.screens.abstract_screen import Screen
 from schedule import Scheduler, CancelJob
 from hardware.screens.check_configuration import CheckConfiguration
@@ -7,19 +8,15 @@ class WelcomeScreen(Screen):
     def __init__(self):
         self._finish_booting = False
 
-    def schedule(self, schedule: Scheduler):
+    def on_enter(self, schedule: Scheduler, drivers: Drivers):
         schedule.every(2).seconds.do(self._finish_booting_app)
+        drivers.lcd.display('The Bindicator', 'When is bins?', drivers.lcd.TEXT_STYLE_CENTER)
 
     def _finish_booting_app(self):
         self._finish_booting = True
         return CancelJob
 
-
-
-    def show_initial_state(self, drivers):
-        drivers.lcd.display('The Bindicator', 'When is bins?', drivers.lcd.TEXT_STYLE_CENTER)
-
-    def redirect(self):
+    def tick(self, drivers):
         if self._finish_booting:
             return CheckConfiguration()
 

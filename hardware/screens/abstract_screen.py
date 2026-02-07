@@ -1,27 +1,17 @@
 from abc import ABC, abstractmethod
 from schedule import Scheduler
-
+from __future__ import annotations
+from hardware.drivers.drivers import Drivers
 from hardware.drivers.inputs import InputEvents
+from hardware.main import QuitApp
 
 
 class Screen(ABC):
-    def schedule(self, schedule: Scheduler):
+    def on_enter(self, schedule: Scheduler, drivers: Drivers):
         pass
 
-    def tick(self, drivers):
+    def tick(self, drivers) -> Screen | None | QuitApp:
         pass
 
     def handle_input(self, event: InputEvents):
-        pass
-
-    def redirect(self):
-        return None
-
-    def show_initial_state(self, drivers):
-        pass
-
-    def should_quit(self):
-        return False
-
-    def on_left_button_pressed(self):
         pass

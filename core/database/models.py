@@ -1,6 +1,6 @@
 # These are the database representation
 
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, UniqueConstraint, JSON
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Date, ForeignKey, UniqueConstraint, JSON
 from sqlalchemy.orm import relationship
 from core.database.database import Base
 from sqlalchemy.sql import func
@@ -19,8 +19,8 @@ class Bin(Base):
 class Schedule(Base):
     __tablename__ = "schedules"
     id = Column(Integer, primary_key=True, autoincrement=True)
-    start = Column(DateTime, nullable=False)
-    end = Column(DateTime, nullable=True)
+    start = Column(Date, nullable=False)
+    end = Column(Date, nullable=True)
     repeat_weeks = Column(Integer, nullable=False)
     bin_id = Column(Integer, ForeignKey("bins.id"), nullable=False)
 
@@ -32,8 +32,8 @@ class Schedule(Base):
 class BinDayReplacement(Base):
     __tablename__ = "bin_day_replacements"
     id = Column(Integer, primary_key=True, autoincrement=True)
-    replace = Column(DateTime)
-    replace_with = Column(DateTime, nullable=False)
+    replace = Column(Date)
+    replace_with = Column(Date, nullable=False)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

@@ -3,6 +3,7 @@ from typing import Optional, Any
 from core.database import models, schemas
 from sqlalchemy import func
 from datetime import datetime
+from sqlalchemy import or_
 
 
 class PaginationOutOfRange(Exception):
@@ -186,6 +187,18 @@ class ScheduleRepository:
         self.db.delete(db_schedule)
         self.db.commit()
         return True
+
+    def get_all_active(self):
+        # Get all schedules where end is in the future, or empty
+
+        db_schedules = self.db.query(models.Schedule).filter(
+            or_(
+                models.Schedule.end == None,
+                models.Schedule.end >= func.now()
+            )
+        ).all()
+
+        return [schemas.Schedule.model_validate(s) for s in db_schedules]
 
 class BinDayReplacementRepository:
     def __init__(self, db: Session):
