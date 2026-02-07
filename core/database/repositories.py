@@ -1,8 +1,9 @@
 from sqlalchemy.orm import Session
-from typing import Optional
+from typing import Optional, Any
 from core.database import models, schemas
 from sqlalchemy import func
 from datetime import datetime
+
 
 class PaginationOutOfRange(Exception):
     pass
@@ -245,3 +246,61 @@ class BinDayReplacementRepository:
         self.db.delete(db_replacement)
         self.db.commit()
         return True
+
+class SettingsRepository:
+    def __init__(self, db: Session):
+        self.db = db
+
+    def get_settings_row(self) -> models.Settings:
+        settings = self.db.query(models.Settings).first()
+        if not settings:
+            settings = models.Settings()
+            self.db.add(settings)
+            self.db.commit()
+            self.db.refresh(settings)
+        # Ensure all fields are set, using defaults if missing
+        for field, model_field in schemas.SettingsBase.model_fields.items():
+            if getattr(settings, field, None) is None:
+                setattr(settings, field, model_field.default)
+        return settings
+
+    def get_by_key(self, key: str) -> Any:
+        db_settings = self.get_settings_row()
+
+        if hasattr(db_settings, key):
+            return getattr(db_settings, key)
+
+        raise KeyError(f"Setting '{key}' not found")
+
+    def get_all(self) -> schemas.SettingsBase:
+        settings_row = self.get_settings_row()
+        # Convert SQLAlchemy model to dict for Pydantic
+        settings_dict = {field: getattr(settings_row, field) for field in schemas.SettingsBase.model_fields}
+        return schemas.SettingsBase.model_validate(settings_dict)
+
+    def create_or_update(self, settings_data: schemas.SettingsEdit) -> schemas.SettingsBase:
+        db_settings = self.get_settings_row()
+
+        for field in settings_data.model_fields_set:
+            if hasattr(db_settings, field):
+                setattr(db_settings, field, getattr(settings_data, field))
+
+        self.db.commit()
+        self.db.refresh(db_settings)
+
+        # Convert SQLAlchemy model to dict for Pydantic
+        settings_dict = {field: getattr(db_settings, field) for field in schemas.SettingsBase.model_fields}
+        return schemas.SettingsBase.model_validate(settings_dict)
+
+    def delete_by_key(self, key):
+        db_settings = self.get_settings_row()
+
+        if hasattr(db_settings, key):
+            # Reset to default as defined in schema
+            default_value = schemas.SettingsBase.model_fields[key].default
+            setattr(db_settings, key, default_value)
+
+            self.db.commit()
+            self.db.refresh(db_settings)
+        else:
+            raise KeyError(f"Setting '{key}' not found")

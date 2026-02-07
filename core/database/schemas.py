@@ -3,6 +3,7 @@
 from pydantic import BaseModel
 from datetime import datetime
 from typing import Optional
+from pydantic import Field
 
 # class HomeBase(BaseModel):
 #     name: str
@@ -89,3 +90,22 @@ class BinDayReplacement(BinDayReplacementBase):
     model_config = {
         "from_attributes": True,
     }
+
+
+class SettingsBase(BaseModel):
+    timeout: int = Field(default=120, ge=1, le=3600)
+
+class SettingsEdit(BaseModel):
+    timeout: Optional[int] = Field(None, ge=1, le=3600)
+
+    model_config = {
+        "from_attributes": True,
+        "extra": "forbid",
+    }
+
+    # @field_validator("app_name")
+    # @classmethod
+    # def name_must_be_capitalized(cls, v: str):
+    #     if v and not v[0].isupper():
+    #         raise ValueError("App name must start with a capital letter")
+    #     return v
