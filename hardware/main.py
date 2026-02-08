@@ -5,15 +5,15 @@ from pathlib import Path
 root_dir = Path(__file__).resolve().parents[1]
 sys.path.append(str(root_dir))
 
-from hardware.screens.error import ErrorScreen
+from hardware.screens.flash_messages.error import ErrorScreen
 import RPi.GPIO as GPIO
 import signal
 from hardware.drivers.lcd import Lcd
 from hardware.drivers.lights import Lights
 from hardware.drivers.movement import Movement
 from hardware.drivers.buttons import Buttons
-from hardware.screens.goodbye import GoodbyeScreen
-from hardware.screens.welcome import WelcomeScreen
+from hardware.screens.flash_messages.goodbye import GoodbyeScreen
+from hardware.screens.flash_messages.welcome import WelcomeScreen
 import logging
 import time
 import schedule

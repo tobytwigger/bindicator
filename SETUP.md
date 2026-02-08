@@ -13,7 +13,7 @@
 	- Set up wifi (for development only)
 	- Enable SSH (feel free to add key here)
 
-For headless setup, I think it requires a later version of rasppi imager. 
+For headless setup, I think it requires a later version of rasppi imager than apt gave me. 
 
 # Setup
 

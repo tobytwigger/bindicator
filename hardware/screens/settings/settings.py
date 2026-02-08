@@ -65,8 +65,8 @@ class Settings(Screen):
             return QuitApp()
 
         elif self.options[self.selected_option] == "Back":
-            from hardware.screens.today import Today
+            from hardware.screens.bins.bin_collections import BinCollections
 
-            return Today()
+            return BinCollections()
 
         return None

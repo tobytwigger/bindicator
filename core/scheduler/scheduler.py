@@ -1,6 +1,6 @@
 import datetime
 from typing import List
-
+from core.database import models
 from core.database.repositories import ScheduleRepository, BinRepository
 
 
@@ -81,3 +81,38 @@ class Scheduler:
         """
         Get the dates of future collections, after the 'after' date or now if given, and before the 'until' date (if given)
         """
+
+
+class BinCollectionExplorer:
+
+    def __init__(self, bin_id: int | None = None):
+        self.bin_id = bin_id
+
+    # @contextmanager
+    # def _with_db(self):
+    #     db = SessionLocal()
+    #     try:
+    #         yield db
+    #     finally:
+    #         db.close()
+
+
+    #
+    # def _load_data_up_to(self, up_to: datetime.date):
+    #     with self._with_db(self) as db:
+    #         bin_scheduler = BinScheduler(db)
+    #         # Use bin_scheduler as needed
+    #         pass
+    def get_bins_due_out_on(self, date: datetime.date) -> List[models.Bin]:
+        """
+        Get all the bins that are due on the given date
+        :param date:
+        :return:
+        """
+        pass
+
+    def get_next_collection_date_after(self, date: datetime.date) -> datetime.date | None:
+        pass
+
+    def get_collection_date_before(self, _current_date) -> datetime.date | None:
+        pass

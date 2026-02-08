@@ -18,8 +18,8 @@ class WelcomeScreen(Screen):
 
     def tick(self, drivers):
         if self._finish_booting:
-            from hardware.screens.today import Today
+            from hardware.screens.bins.bin_collections import BinCollections
 
-            return Today()
+            return BinCollections()
 
         return None
