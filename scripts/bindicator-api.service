@@ -5,7 +5,7 @@ After=network.target
 [Service]
 User=toby
 WorkingDirectory=/home/toby/bindicator
-ExecStart=/home/toby/bindicator/.venv/bin/python /home/toby/bindicator/.venv/bin/fastapi run /home/toby/bindicator/backend/app/main.py
+ExecStart=/home/toby/bindicator/.venv/bin/python /home/toby/bindicator/.venv/bin/fastapi run /home/toby/bindicator/backend/main.py
 Restart=always
 
 [Install]
