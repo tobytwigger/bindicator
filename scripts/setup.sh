@@ -5,7 +5,7 @@ set -e
 echo "Starting installation..."
 
 # 1. Update and install dependencies
-sudo apt update && sudo apt install -y python3-venv nginx git
+sudo apt update && sudo apt install -y python3-venv nginx git mosquitto mosquitto-clients
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # 2. Setup Python Virtual Environment
@@ -29,5 +29,10 @@ sudo cp scripts/bindicator.conf /etc/nginx/sites-available/
 sudo ln -sf /etc/nginx/sites-available/bindicator.conf /etc/nginx/sites-enabled/
 sudo rm -f /etc/nginx/sites-enabled/default
 sudo systemctl restart nginx
+
+sudo systemctl enable mosquitto
+sudo systemctl start mosquitto
+
+#alembic upgrade head
 
 echo "Installation Complete! Access via http://$(hostname).local"

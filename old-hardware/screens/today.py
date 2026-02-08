@@ -71,6 +71,7 @@ class Today(ScreenUsingState):
     def show_bins_due(self, drivers, date, bins):
 
         next_bins = self._state.bin_data.value.next_date_after(date)
+        previous_bins = self._state.bin_data.value.next_date_before(date)
 
         bins_as_text = ''
         for b in bins.bins:
@@ -80,6 +81,7 @@ class Today(ScreenUsingState):
             format_date(date),
             bins_as_text,
             drivers.lcd.TEXT_STYLE_CENTER,
+            prefix='<' if previous_bins else None,
             suffix='>' if next_bins is not None else None,
         )
 

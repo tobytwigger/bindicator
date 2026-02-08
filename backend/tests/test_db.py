@@ -5,6 +5,7 @@ from sqlalchemy.pool import StaticPool
 from fastapi.testclient import TestClient
 from core.database.database import Base, get_db
 from backend.main import app
+from core.database import models
 
 # Use an in-memory SQLite database for testing
 TEST_SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
@@ -21,6 +22,11 @@ Base.metadata.create_all(bind=engine)
 @pytest.fixture
 def db():
     db = TestingSessionLocal()
+    # Delete all existing data
+    db.query(models.Bin).delete()
+    db.query(models.Schedule).delete()
+    db.commit()
+
     try:
         yield db
     finally:

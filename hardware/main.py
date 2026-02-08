@@ -20,7 +20,6 @@ import schedule
 import threading
 from hardware.drivers.drivers import Drivers
 from hardware.drivers.inputs import Inputs
-from hardware.config.config import ConfigRepository
 from hardware.screens.abstract_screen import Screen, QuitApp
 
 should_kill = False
@@ -37,8 +36,6 @@ def run():
 
     set_up_gpio()
 
-    config = ConfigRepository().get()
-
     drivers = Drivers(
         Lcd(),
         Lights(),
@@ -48,7 +45,7 @@ def run():
 
     inputs = Inputs(
         drivers,
-        config.timeout,
+        120,
     )
 
     screen = WelcomeScreen()
@@ -177,7 +174,8 @@ class AppRunner:
         #     self._redirect_to_config = True
 
     def _check_settings(self):
-        self._inputs._movement_timeout = ConfigRepository().get().timeout
+        pass
+        # self._inputs._movement_timeout = ConfigRepository().get().timeout
 
     def _cleanup(self):
         if self._stop_schedule is not None:

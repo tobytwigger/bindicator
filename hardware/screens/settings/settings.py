@@ -6,6 +6,7 @@ from schedule import Scheduler, CancelJob
 from hardware.drivers.inputs import InputEvents
 import datetime
 
+from hardware.screens.settings.internet import Internet
 from hardware.utils.date_format import format_date
 from hardware.screens.abstract_screen import Screen, QuitApp
 
@@ -15,24 +16,22 @@ class Settings(Screen):
     options: List[str] = [
         "Hardware Test",
         "Restart Device",
+        "Internet",
         "Back",
     ]
 
-    selected_option: int = 0
+    def __init__(self):
+        self.selected_option: int = 0
 
     def on_enter(self, schedule: Scheduler, drivers: Drivers):
         self._update_screen(drivers)
-        drivers.lights.set_lights(LightState.PHASE, LightState.PHASE, LightState.PHASE, LightState.PHASE)
+        drivers.lights.set_lights(LightState.OFF, LightState.OFF, LightState.OFF, LightState.OFF)
 
     def _update_screen(self, drivers: Drivers):
         drivers.lcd.display('Settings', self.options[self.selected_option] or "Unknown Option", drivers.lcd.TEXT_STYLE_CENTER, prefix="<", suffix=">")
 
     def handle_inputs(self, events: List[InputEvents], drivers: Drivers = None):
         # If we press both left and right, show the 'today' screen
-        # if InputEvents.LEFT_BUTTON_PRESSED in events and InputEvents.RIGHT_BUTTON_PRESSED in events:
-        #     from hardware.screens.today import Today
-        #
-        #     return Today()
 
         if InputEvents.LEFT_BUTTON_PRESSED in events:
             if self.selected_option > 0:
@@ -57,12 +56,15 @@ class Settings(Screen):
 
     def _activate_option(self) -> Screen | None | QuitApp:
         if self.options[self.selected_option] == "Hardware Test":
-            from hardware.screens.settings.hardware_test import HardwareTest
+            from hardware.screens.settings.hardware_tester import HardwareTester
 
-            return HardwareTest()
+            return HardwareTester()
 
         elif self.options[self.selected_option] == "Restart Device":
             return QuitApp()
+
+        elif self.options[self.selected_option] == "Internet":
+            return Internet()
 
         elif self.options[self.selected_option] == "Back":
             from hardware.screens.bins.bin_collections import BinCollections

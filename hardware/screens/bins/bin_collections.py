@@ -1,6 +1,6 @@
 from typing import List
 from contextlib import contextmanager
-
+import math
 from core.database.database import SessionLocal
 from hardware.drivers.drivers import Drivers
 from hardware.drivers.lights import LightState
@@ -8,7 +8,6 @@ from hardware.screens.abstract_screen import Screen, QuitApp
 from schedule import Scheduler, CancelJob
 from hardware.drivers.inputs import InputEvents
 import datetime
-from core.scheduler.scheduler import Scheduler as BinScheduler
 from core.scheduler.scheduler import BinCollectionExplorer
 from core.database import models
 from hardware.screens.bins.single_bin_collection import SingleBinCollection
@@ -24,8 +23,6 @@ class BinCollections(Screen):
 
     def on_enter(self, schedule: Scheduler, drivers: Drivers):
         self._display_correct_outputs(drivers)
-        drivers.lcd.display('Today', format_date(datetime.date.today()), drivers.lcd.TEXT_STYLE_CENTER)
-        drivers.lights.set_lights(LightState.ON, LightState.ON, LightState.ON, LightState.ON)
 
     def handle_inputs(self, events: List[InputEvents], drivers: Drivers):
         # If we press both left and right, show the 'settings' screen
@@ -38,13 +35,19 @@ class BinCollections(Screen):
             previous_date = self._bin_collection_explorer.get_collection_date_before(self._current_date)
             if previous_date is not None and previous_date >= datetime.date.today():
                 self._current_date = previous_date
-                self._display_correct_outputs(drivers)
-                return None
+            else:
+                self._current_date = datetime.date.today()
 
-        if InputEvents.RIGHT_BUTTON_PRESSED in events:
-            self._current_date = self._bin_collection_explorer.get_next_collection_date_after(self._current_date) or datetime.date.today()
             self._display_correct_outputs(drivers)
             return None
+
+        if InputEvents.RIGHT_BUTTON_PRESSED in events:
+            self._current_date = self._bin_collection_explorer.get_collection_date_after(self._current_date) or datetime.date.today()
+            self._display_correct_outputs(drivers)
+            return None
+
+        if InputEvents.BIN_1_PRESSED in events or InputEvents.BIN_2_PRESSED in events or InputEvents.BIN_3_PRESSED in events or InputEvents.BIN_4_PRESSED in events:
+            return SingleBinCollection.from_input_events(events)
 
         return None
 
@@ -55,7 +58,7 @@ class BinCollections(Screen):
 
     def _display_correct_outputs(self, drivers: Drivers):
         bins_due = self._bin_collection_explorer.get_bins_due_out_on(self._current_date)
-        next_out = self._bin_collection_explorer.get_next_collection_date_after(self._current_date)
+        next_out = self._bin_collection_explorer.get_collection_date_after(self._current_date)
 
         if len(bins_due) > 0:
             self._display_bins_due(drivers, bins_due, next_out)
@@ -71,6 +74,7 @@ class BinCollections(Screen):
             format_date(self._current_date),
             bins_as_text,
             drivers.lcd.TEXT_STYLE_CENTER,
+            prefix='<' if self._current_date != datetime.date.today() else None,
             suffix='>' if next_out is not None else None,
         )
 
@@ -92,7 +96,7 @@ class BinCollections(Screen):
             # is_due_out = bins_are_due and getattr(b, "is_taken_out", False) is False
             # if is_due_out:
             #     currently_due_bins[b.position] = b
-            bin_state[b.position - 1] = LightState.PHASE
+            bin_state[b.position - 1] = LightState.ON
 
         drivers.lights.set_lights(
             bin_state[0],
@@ -104,12 +108,15 @@ class BinCollections(Screen):
         return
 
 
-    def _display_no_bins_due(self, drivers, days_until_next_due: int | None):
+    def _display_no_bins_due(self, drivers, next_out: datetime.date | None):
+
+        days_until_next_due = math.ceil((next_out - datetime.date.today()).days) if next_out is not None else None
+
         drivers.lcd.display(
             'No bins due',
             'Out in ' + str(days_until_next_due) + ' ' + ('day' if days_until_next_due == 1 else 'days'),
             drivers.lcd.TEXT_STYLE_CENTER,
-            suffix='>' if days_until_next_due is not None else None,
+            suffix='>' if next_out is not None else None,
         )
 
         drivers.lights.all_off()

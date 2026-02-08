@@ -1,118 +1,101 @@
 import datetime
-from typing import List
+from typing import List, Dict, Optional
 from core.database import models
+from core.database.database import SessionLocal
 from core.database.repositories import ScheduleRepository, BinRepository
 
-
-class Scheduler:
-    """
-    Handle scheduling of bins in the future
-
-    This class gets all the input info, e.g. from the database, and can create a future schedule.
-    - Get next time single bin is out
-    - Get next bin dates with bins
-    - Get next bin dates with bins after X date
-    - Get next time single bin is out after X date
-    """
-
-    def __init__(self, db, calculate_up_to_date: datetime.date | None = None):
-        if calculate_up_to_date is None:
-            calculate_up_to_date = datetime.datetime.now().date() + datetime.timedelta(days=365)
-
-        self._calculate_up_to_date = calculate_up_to_date
+class BinCollectionExplorer:
+    def __init__(self, db: Optional[SessionLocal] = None):
+        self._calculate_up_to_date = datetime.datetime.now().date() + datetime.timedelta(days=730)
+        self._bin_date_cache: Dict[datetime.date, List[int]] = {} # List of bin IDs, keyed by the date they go out
+        self._bin_obj_cache: Dict[int, models.Bin] = {}
         self._db = db
-        self._bin_date_cache: dict[str, List[datetime.date]] = {}
-        self._initialise_values()
+        self._load_bins()
+        self._load_bin_collections()
 
-    def _initialise_values(self, start_from=None):
-        # Get the schedules, where end date is null or
-        bin_repo = BinRepository(self._db)
+    def _load_bins(self):
+        self._bin_obj_cache = {}
 
+        db = SessionLocal() if self._db is None else self._db
+
+        bin_repo = BinRepository(db)
         for bin in bin_repo.get_all():
-            self._bin_date_cache[str(bin.id)] = []
+            self._bin_obj_cache[bin.id] = bin
 
-        schedule_repo = ScheduleRepository(self._db)
+        if self._db is None:
+            db.close()
+
+    def _load_bin_collections(self):
+        db = SessionLocal() if self._db is None else self._db
+
+        schedule_repo = ScheduleRepository(db)
 
         for schedule in schedule_repo.get_all_active():
+            if schedule.bin_id not in self._bin_obj_cache:
+                print("Bin not in object cache but is in schedule!")
+                continue
             # Set the scheduled bin dates based on this.
             # Start at the start of the schedule
-            current_date = max(schedule.start.date(), start_from) if start_from is not None else schedule.start.date()
+            current_date = schedule.start.date()
             # We want to iterate through from current_date, to either 1 year in the future or the end date
             end_date = self._calculate_up_to_date if schedule.end is None else min(schedule.end.date(), self._calculate_up_to_date)
             while current_date <= end_date:
-                self._bin_date_cache[str(schedule.bin_id)].append(current_date)
+                if current_date >= datetime.date.today():
+                    if current_date not in self._bin_date_cache:
+                        self._bin_date_cache[current_date] = []
+
+                    self._bin_date_cache[current_date].append(self._bin_obj_cache[schedule.bin_id].id)
+
                 current_date += datetime.timedelta(weeks=schedule.repeat_weeks)
 
-    def get_date_bin_next_due_out(self, bin_id: int, after: datetime.date | None =None):
-        """
-        Get the dates that a single bin is due out, after the 'after' date or now if given
-        :param bin_id: The ID of the bin
-        :param after: The date after which to find the next due date. If None, defaults to now.
-        :return:
-        """
-        if after is None:
-            after = datetime.datetime.now().date()
+        # Sort the bin_date_cache by key
+        self._bin_date_cache = dict(sorted(self._bin_date_cache.items()))
 
-        for date in self._bin_date_cache[str(bin_id)]:
-            if date > after:
-                return date
+        if self._db is None:
+            db.close()
+
+    def get_bins_due_out_on(self, date: datetime.date) -> List[models.Bin]:
+        if date in self._bin_date_cache:
+            return [self._bin_obj_cache[bin_id] for bin_id in self._bin_date_cache[date]]
+
+        return []
+
+    def get_bin_by_id(self, bin_id: int) -> models.Bin | None:
+        bin = self._bin_obj_cache.get(bin_id)
+        if bin is not None:
+            return bin
 
         return None
 
-    def get_all_dates_bin_due_out(self, bin_id: int, after: datetime.date | None =None) -> list[datetime.date]:
-        """
-        Get all the dates that a single bin is due out, after the 'after' date or now if given
+    def get_bin_by_position(self, position: int) -> models.Bin | None:
+        bin = next((b for b in self._bin_obj_cache.values() if b.position == position), None)
+        if bin is not None:
+            return bin
 
-        :param bin_id:
-        :param after:
-        :return:
-        """
-        if after is None:
-            after = datetime.datetime.now().date()
+        return None
 
-        if after > self._calculate_up_to_date:
-            start_from = self._calculate_up_to_date
-            self._calculate_up_to_date = after
-            self._initialise_values(start_from)
-
-        return [b for b in self._bin_date_cache[str(bin_id)] if b >= after]
-
-    def get_collection_dates(self, after : datetime.date | None = None, until : datetime.date | None = None):
-        """
-        Get the dates of future collections, after the 'after' date or now if given, and before the 'until' date (if given)
-        """
+    def get_collection_date_after(self, date: datetime.date, bin_id: int | None = None) -> Optional[datetime.date]:
+        # Iterate through the keys until we find one larger than date
+        for d, bin_ids in self._bin_date_cache.items():
+            if bin_id is not None and bin_id not in bin_ids:
+                continue
+            if d > date:
+                return d
 
 
-class BinCollectionExplorer:
+        return None
 
-    def __init__(self, bin_id: int | None = None):
-        self.bin_id = bin_id
+    def get_collection_date_before(self, date: datetime.date, bin_id: int | None = None) -> Optional[datetime.date]:
+        # Iterate through the keys until we find one larger than date
+        for d in sorted(self._bin_date_cache.keys(), reverse=True):
+            bin_ids = self._bin_date_cache[d]
 
-    # @contextmanager
-    # def _with_db(self):
-    #     db = SessionLocal()
-    #     try:
-    #         yield db
-    #     finally:
-    #         db.close()
+            if bin_id is not None and bin_id not in bin_ids:
+                continue
+
+            if d < date:
+                return d
+
+        return None
 
 
-    #
-    # def _load_data_up_to(self, up_to: datetime.date):
-    #     with self._with_db(self) as db:
-    #         bin_scheduler = BinScheduler(db)
-    #         # Use bin_scheduler as needed
-    #         pass
-    def get_bins_due_out_on(self, date: datetime.date) -> List[models.Bin]:
-        """
-        Get all the bins that are due on the given date
-        :param date:
-        :return:
-        """
-        pass
-
-    def get_next_collection_date_after(self, date: datetime.date) -> datetime.date | None:
-        pass
-
-    def get_collection_date_before(self, _current_date) -> datetime.date | None:
-        pass

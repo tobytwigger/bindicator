@@ -189,8 +189,7 @@ class ScheduleRepository:
         return True
 
     def get_all_active(self):
-        # Get all schedules where end is in the future, or empty
-
+        # Get all schedules where end is in the future, or empty, and start is now or in the past
         db_schedules = self.db.query(models.Schedule).filter(
             or_(
                 models.Schedule.end == None,
