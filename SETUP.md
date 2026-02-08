@@ -54,6 +54,12 @@ May possibly need to make them executable first? Unsure if this persists along w
 4. Run setup.sh
 2. Add `user toby;` to the top of /etc/nginx/nginx.conf
 
+## Accessing the Application
+
+The application is available at `http://bins.local` on your local network.
+
+**HTTPS Access**: If you try to access `https://bins.local`, the nginx configuration will automatically redirect you to `http://bins.local`. This avoids SSL certificate complexity for local development while ensuring users don't encounter "address not found" errors.
+
 sudo nano /etc/mosquitto/mosquitto.conf
 ADD to the bottom:
 listener 1883

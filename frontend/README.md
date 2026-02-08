@@ -1,75 +1,73 @@
-# Nuxt Minimal Starter
+# Bindicator Frontend
 
-Look at the [Nuxt documentation](https://nuxt.com/docs/getting-started/introduction) to learn more.
+A Nuxt 3 Vue frontend for the Bindicator bin collection management system.
+
+## Features
+- **Bins Management**: Add, edit, delete, and reorder bins with drag-and-drop
+- **Schedule Management**: Create schedules by dragging bins onto a calendar, view all future bin days
+- **Bin Day Replacements**: Manage holiday replacements and special collection dates
+- **Settings**: Configure display timeout and other preferences
+
+## Tech Stack
+- **Nuxt 3** - Vue framework
+- **TanStack Query (Vue Query)** - API state management with automatic caching and invalidation
+- **FullCalendar** - Interactive calendar with drag-and-drop
+- **Nuxt UI** - UI component library
+- **date-fns** - Date formatting and manipulation
+- **VueUse** - Composables for drag-and-drop
+- **TypeScript** - Auto-generated types from OpenAPI schema
 
 ## Setup
 
-Make sure to install dependencies:
+### Prerequisites
+- Node.js 18+ and npm
+- Backend API running (for type generation)
 
+### Installation
+1. 
+2. Install dependencies:
 ```bash
-# npm
 npm install
-
-# pnpm
-pnpm install
-
-# yarn
-yarn install
-
-# bun
-bun install
 ```
 
-## Development Server
+2. Create `.env` file:
+```bash
+NUXT_PUBLIC_API_URL=http://localhost:8000
+```
 
-Start the development server on `http://localhost:3000`:
+3. Generate TypeScript types from API:
+```bash
+npm run generate:types
+```
+
+### Development
 
 ```bash
-# npm
 npm run dev
-
-# pnpm
-pnpm dev
-
-# yarn
-yarn dev
-
-# bun
-bun run dev
 ```
+The app will be available at `http://localhost:3000`
 
-## Production
-
-Build the application for production:
-
+### Build for Production
 ```bash
-# npm
 npm run build
-
-# pnpm
-pnpm build
-
-# yarn
-yarn build
-
-# bun
-bun run build
+npm run preview
 ```
 
-Locally preview production build:
+## Type Generation
+
+The frontend uses `openapi-typescript` to generate TypeScript types from the OpenAPI schema:
 
 ```bash
-# npm
-npm run preview
-
-# pnpm
-pnpm preview
-
-# yarn
-yarn preview
-
-# bun
-bun run preview
+npm run generate:types
 ```
 
-Check out the [deployment documentation](https://nuxt.com/docs/getting-started/deployment) for more information.
+This should be run:
+- After initial setup
+- When API schema changes
+- After pulling updates that modify the backend
+
+## Development Notes
+
+### Date Handling
+All dates are sent to the API as ISO date strings (YYYY-MM-DD) without time components.
+Use `date-fns` `format()` function with `'yyyy-MM-dd'` format for API calls.

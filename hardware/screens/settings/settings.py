@@ -14,7 +14,7 @@ from hardware.screens.abstract_screen import Screen, QuitApp
 class Settings(Screen):
 
     options: List[str] = [
-        "Hardware Test",
+        "Remote Control",
         "Restart Device",
         "Internet",
         "Back",
@@ -55,10 +55,10 @@ class Settings(Screen):
         return None
 
     def _activate_option(self) -> Screen | None | QuitApp:
-        if self.options[self.selected_option] == "Hardware Test":
-            from hardware.screens.settings.hardware_tester import HardwareTester
+        if self.options[self.selected_option] == "Remote Control":
+            from hardware.screens.settings.remote_control import RemoteControl
 
-            return HardwareTester()
+            return RemoteControl()
 
         elif self.options[self.selected_option] == "Restart Device":
             return QuitApp()

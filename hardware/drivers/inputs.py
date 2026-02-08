@@ -3,7 +3,12 @@ from hardware.drivers.movement import Movement
 import time
 from hardware.drivers.drivers import Drivers
 from enum import Enum
-import time
+import queue
+import threading
+import logging
+from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 # class syntax
 
@@ -18,53 +23,186 @@ class InputEvents(Enum):
     BIN_4_PRESSED = 8
 
 class Inputs:
-    def __init__(self, drivers: Drivers, timeout):
+    # Debounce interval for button presses (seconds)
+    DEBOUNCE_INTERVAL = 0.3
+
+    # Maximum queue size before dropping events
+    MAX_QUEUE_SIZE = 500
+
+    # Polling interval for GPIO checks (seconds)
+    POLL_INTERVAL = 0.01
+
+    def __init__(self, drivers: Drivers, mqtt_client=None):
         self._drivers = drivers
-        self._throttle = {}
-        self._movement_timeout = timeout
-        self._movement_detected_at = time.time()
+        self._movement_timeout = 120
+
+        self._mqtt_client = mqtt_client
+
+        # Event queue shared between background thread and main thread
+        self._event_queue = queue.Queue(maxsize=self.MAX_QUEUE_SIZE)
+
+        # Thread control
+        self._stop_event = threading.Event()
+        self._polling_thread: Optional[threading.Thread] = None
+
+        # Debouncing state (used by background thread)
+        self._last_event_time = {}
+
+        # Movement state (shared between threads, accessed with lock)
+        self._movement_lock = threading.Lock()
+        self._movement_detected_at: Optional[float] = None
+
+
+
+    def start(self):
+        """Start the background polling thread and connect MQTT if configured."""
+        if self._polling_thread is not None and self._polling_thread.is_alive():
+            logger.warning("Input polling thread already running")
+            return
+
+        # Connect MQTT if configured
+        if self._mqtt_client:
+            try:
+                logger.info("Connecting to MQTT...")
+                self._mqtt_client.connect()
+                logger.info("MQTT connected successfully")
+            except Exception as e:
+                logger.warning(f"Failed to connect to MQTT broker: {e}")
+                logger.info("Continuing without MQTT support")
+                self._mqtt_client = None  # Disable MQTT if connection fails
+
+        # Start the background polling thread
+        self._stop_event.clear()
+        self._polling_thread = threading.Thread(target=self._poll_inputs_loop, daemon=True)
+        self._polling_thread.start()
+        logger.info("Started input polling thread")
+
+    def stop(self):
+        """Stop the background polling thread and disconnect MQTT."""
+        if self._polling_thread is None:
+            logger.debug("No polling thread to stop")
+            return
+
+        logger.info("Stopping input polling thread...")
+        self._stop_event.set()
+
+        # Wait for thread to finish
+        if self._polling_thread.is_alive():
+            logger.debug("Waiting for polling thread to finish...")
+            self._polling_thread.join(timeout=2.0)
+
+        # Disconnect MQTT if configured
+        if self._mqtt_client:
+            logger.info("Disconnecting MQTT...")
+            self._mqtt_client.disconnect()
+            logger.info("MQTT disconnected")
+
+        logger.info("Input polling thread stopped")
 
     def listen(self):
+        """
+        Retrieve all available events from the queue.
+        This is called by the main application loop.
+        """
         events = []
 
-        if self._drivers.movement.movement_detected():
-            if self._movement_detected_at is None:
-                events.append(InputEvents.MOVEMENT_DETECTED)
-            self._movement_detected_at = time.time()
+        # Drain all available events from the queue
+        while True:
+            try:
+                event = self._event_queue.get_nowait()
+                events.append(event)
+                logger.debug(f"Retrieved {event.name} from queue")
+            except queue.Empty:
+                break
 
-        if self._movement_detected_at and time.time() - self._movement_detected_at > self._movement_timeout:
-            events.append(InputEvents.MOVEMENT_STOPPED)
-            self._movement_detected_at = None
+        # Check movement timeout in main thread
+        # This needs to be done here to maintain timing accuracy
+        with self._movement_lock:
+            if self._movement_detected_at is not None:
+                time_elapsed = time.time() - self._movement_detected_at
+                if time_elapsed > self._movement_timeout:
+                    logger.info(f"Movement timeout reached ({time_elapsed:.1f}s > {self._movement_timeout}s)")
+                    logger.debug("Movement stopped, enqueueing MOVEMENT_STOPPED")
+                    events.append(InputEvents.MOVEMENT_STOPPED)
+                    self._movement_detected_at = None
 
-        if self._drivers.buttons.is_left_pressed():
-            if self.throttle(InputEvents.LEFT_BUTTON_PRESSED, 0.3):
-                events.append(InputEvents.LEFT_BUTTON_PRESSED)
+                    # Publish GPIO event to MQTT so external tools can see it
+                    if self._mqtt_client:
+                        self._mqtt_client.publish_event(InputEvents.MOVEMENT_STOPPED)
 
-        if self._drivers.buttons.is_right_pressed():
-            if self.throttle(InputEvents.RIGHT_BUTTON_PRESSED, 0.3):
-                events.append(InputEvents.RIGHT_BUTTON_PRESSED)
-
-        if self._drivers.buttons.is_bin_1_pressed():
-            if self.throttle(InputEvents.BIN_1_PRESSED, 0.3):
-                events.append(InputEvents.BIN_1_PRESSED)
-
-        if self._drivers.buttons.is_bin_2_pressed():
-            if self.throttle(InputEvents.BIN_2_PRESSED, 0.3):
-                events.append(InputEvents.BIN_2_PRESSED)
-
-        if self._drivers.buttons.is_bin_3_pressed():
-            if self.throttle(InputEvents.BIN_3_PRESSED, 0.3):
-                events.append(InputEvents.BIN_3_PRESSED)
-
-        if self._drivers.buttons.is_bin_4_pressed():
-            if self.throttle(InputEvents.BIN_4_PRESSED, 0.3):
-                events.append(InputEvents.BIN_4_PRESSED)
+        if events:
+            logger.debug(f"Returning {len(events)} event(s): {[e.name for e in events]}")
 
         return events
 
-    def throttle(self, key, timeout):
-        if key in self._throttle and time.time() - self._throttle[key] < timeout:
-            return False
+    def _poll_inputs_loop(self):
+        """Background thread that continuously polls GPIO inputs."""
+        while not self._stop_event.is_set():
+            try:
+                self._poll_gpio_inputs()
+                time.sleep(self.POLL_INTERVAL)
+            except Exception as e:
+                logger.error(f"Error in input polling loop: {e}")
 
-        self._throttle[key] = time.time()
-        return True
+    def _poll_gpio_inputs(self):
+        """Poll all GPIO inputs and queue events with debouncing."""
+        current_time = time.time()
+
+        # Check movement sensor
+        if self._drivers.movement.movement_detected():
+            with self._movement_lock:
+                if self._movement_detected_at is None:
+                    # First detection
+                    logger.info(f"Movement detected at {current_time}")
+                    logger.debug("First movement detection, enqueueing MOVEMENT_DETECTED")
+                    self._enqueue_event(InputEvents.MOVEMENT_DETECTED)
+
+                    # Publish GPIO event to MQTT so external tools can see it
+                    if self._mqtt_client:
+                        self._mqtt_client.publish_event(InputEvents.MOVEMENT_DETECTED)
+
+                self._movement_detected_at = current_time
+
+        # Check all button inputs with debouncing
+        if self._drivers.buttons.is_left_pressed():
+            self._enqueue_event_with_debounce(InputEvents.LEFT_BUTTON_PRESSED, current_time)
+
+        if self._drivers.buttons.is_right_pressed():
+            self._enqueue_event_with_debounce(InputEvents.RIGHT_BUTTON_PRESSED, current_time)
+
+        if self._drivers.buttons.is_bin_1_pressed():
+            self._enqueue_event_with_debounce(InputEvents.BIN_1_PRESSED, current_time)
+
+        if self._drivers.buttons.is_bin_2_pressed():
+            self._enqueue_event_with_debounce(InputEvents.BIN_2_PRESSED, current_time)
+
+        if self._drivers.buttons.is_bin_3_pressed():
+            self._enqueue_event_with_debounce(InputEvents.BIN_3_PRESSED, current_time)
+
+        if self._drivers.buttons.is_bin_4_pressed():
+            self._enqueue_event_with_debounce(InputEvents.BIN_4_PRESSED, current_time)
+
+    def _enqueue_event_with_debounce(self, event: InputEvents, current_time: float):
+        """Enqueue an event only if debounce interval has passed."""
+        last_time = self._last_event_time.get(event, 0)
+        time_since_last = current_time - last_time
+
+        if time_since_last >= self.DEBOUNCE_INTERVAL:
+            logger.debug(f"Enqueueing {event.name} (time since last: {time_since_last:.3f}s)")
+            self._last_event_time[event] = current_time
+            self._enqueue_event(event)
+
+            # Publish GPIO event to MQTT so external tools can see it
+            if self._mqtt_client:
+                self._mqtt_client.publish_event(event)
+        else:
+            logger.debug(f"Skipping {event.name} (time since last: {time_since_last:.3f}s < {self.DEBOUNCE_INTERVAL}s)")
+
+    def _enqueue_event(self, event: InputEvents):
+        """Add event to queue, dropping if full."""
+        try:
+            self._event_queue.put_nowait(event)
+            logger.debug(f"Added {event.name} to queue (size: {self._event_queue.qsize()})")
+        except queue.Full:
+            logger.warning(f"Event queue full, dropping event: {event}")
+

@@ -94,9 +94,9 @@ class BinDayReplacement(BinDayReplacementBase):
 
 class SettingsBase(BaseModel):
     timeout: int = Field(default=120, ge=1, le=3600)
-
 class SettingsEdit(BaseModel):
     timeout: Optional[int] = Field(None, ge=1, le=3600)
+
 
     model_config = {
         "from_attributes": True,
@@ -109,3 +109,13 @@ class SettingsEdit(BaseModel):
     #     if v and not v[0].isupper():
     #         raise ValueError("App name must start with a capital letter")
     #     return v
+
+# Calendar endpoint schemas
+class CalendarBin(BaseModel):
+    id: int
+    name: str
+    colour: Optional[str] = None
+
+class CalendarDate(BaseModel):
+    date: str  # ISO date format YYYY-MM-DD
+    bins: list[CalendarBin]

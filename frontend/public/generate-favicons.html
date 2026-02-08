@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Favicon Generator</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 800px;
+      margin: 2rem auto;
+      padding: 0 1rem;
+    }
+    .preview {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+      margin: 2rem 0;
+    }
+    .preview-item {
+      text-align: center;
+    }
+    canvas {
+      border: 1px solid #ccc;
+      background: white;
+    }
+    button {
+      padding: 0.5rem 1rem;
+      margin: 0.25rem;
+      background: #3b82f6;
+      color: white;
+      border: none;
+      border-radius: 0.375rem;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #2563eb;
+    }
+    .status {
+      margin-top: 1rem;
+      padding: 1rem;
+      background: #f0f9ff;
+      border-radius: 0.375rem;
+    }
+  </style>
+</head>
+<body>
+  <h1>🗑️ Bindicator Favicon Generator</h1>
+  <p>This tool generates favicon files from the SVG source.</p>
+
+  <div id="svg-container"></div>
+
+  <div class="preview" id="preview"></div>
+
+  <div>
+    <button onclick="generateAll()">Generate All Favicons</button>
+    <button onclick="downloadAll()">Download All</button>
+  </div>
+
+  <div class="status" id="status"></div>
+
+  <script>
+    const svgSource = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Background circle -->
+  <circle cx="32" cy="32" r="30" fill="#1e293b" opacity="0.95"/>
+
+  <!-- Blue bin (left) -->
+  <g transform="translate(12, 20)">
+    <rect x="2" y="6" width="10" height="14" rx="1" fill="#3b82f6"/>
+    <rect x="1" y="4" width="12" height="2.5" rx="0.5" fill="#60a5fa"/>
+    <rect x="4" y="10" width="4" height="1.5" rx="0.5" fill="#93c5fd" opacity="0.6"/>
+  </g>
+
+  <!-- Green bin (center-left) -->
+  <g transform="translate(22, 22)">
+    <rect x="2" y="6" width="10" height="14" rx="1" fill="#10b981"/>
+    <rect x="1" y="4" width="12" height="2.5" rx="0.5" fill="#34d399"/>
+    <rect x="4" y="10" width="4" height="1.5" rx="0.5" fill="#6ee7b7" opacity="0.6"/>
+  </g>
+
+  <!-- Yellow/Orange bin (center-right) -->
+  <g transform="translate(32, 20)">
+    <rect x="2" y="6" width="10" height="14" rx="1" fill="#f59e0b"/>
+    <rect x="1" y="4" width="12" height="2.5" rx="0.5" fill="#fbbf24"/>
+    <rect x="4" y="10" width="4" height="1.5" rx="0.5" fill="#fde68a" opacity="0.6"/>
+  </g>
+
+  <!-- Red bin (right) -->
+  <g transform="translate(42, 22)">
+    <rect x="2" y="6" width="10" height="14" rx="1" fill="#ef4444"/>
+    <rect x="1" y="4" width="12" height="2.5" rx="0.5" fill="#f87171"/>
+    <rect x="4" y="10" width="4" height="1.5" rx="0.5" fill="#fca5a5" opacity="0.6"/>
+  </g>
+</svg>`;
+
+    const sizes = [
+      { name: 'favicon-16x16.png', size: 16 },
+      { name: 'favicon-32x32.png', size: 32 },
+      { name: 'favicon-48x48.png', size: 48 },
+      { name: 'apple-touch-icon.png', size: 180 },
+      { name: 'android-chrome-192x192.png', size: 192 },
+      { name: 'android-chrome-512x512.png', size: 512 },
+    ];
+
+    const canvases = {};
+
+    function generateAll() {
+      const preview = document.getElementById('preview');
+      preview.innerHTML = '';
+
+      sizes.forEach(({ name, size }) => {
+        const canvas = document.createElement('canvas');
+        canvas.width = size;
+        canvas.height = size;
+        canvases[name] = canvas;
+
+        const ctx = canvas.getContext('2d');
+        const img = new Image();
+        const blob = new Blob([svgSource], { type: 'image/svg+xml' });
+        const url = URL.createObjectURL(blob);
+
+        img.onload = function() {
+          ctx.clearRect(0, 0, size, size);
+          ctx.drawImage(img, 0, 0, size, size);
+          URL.revokeObjectURL(url);
+
+          const div = document.createElement('div');
+          div.className = 'preview-item';
+          div.innerHTML = `
+            <div>${name}</div>
+            <canvas width="${size}" height="${size}" style="width: ${Math.min(size, 128)}px; height: ${Math.min(size, 128)}px;"></canvas>
+            <br>
+            <button onclick="download('${name}')">Download</button>
+          `;
+          const previewCanvas = div.querySelector('canvas');
+          previewCanvas.getContext('2d').drawImage(canvas, 0, 0);
+          preview.appendChild(div);
+        };
+
+        img.src = url;
+      });
+
+      document.getElementById('status').innerHTML = '<strong>✓ Generated ' + sizes.length + ' favicon sizes!</strong><br>Click "Download All" or download individual files.';
+    }
+
+    function download(name) {
+      const canvas = canvases[name];
+      if (!canvas) {
+        alert('Please generate favicons first!');
+        return;
+      }
+
+      canvas.toBlob(function(blob) {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = name;
+        a.click();
+        URL.revokeObjectURL(url);
+      });
+    }
+
+    function downloadAll() {
+      sizes.forEach(({ name }) => {
+        setTimeout(() => download(name), 100 * sizes.indexOf(sizes.find(s => s.name === name)));
+      });
+    }
+
+    // Auto-generate on load
+    window.onload = generateAll;
+  </script>
+</body>
+</html>

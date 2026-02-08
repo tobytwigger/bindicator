@@ -1,65 +1,177 @@
 <template>
-  <UCard title="Configure Your Bins" class="settings-card">
-    <div class="bins-list">
-      <div v-for="(bin, idx) in bins" :key="idx" class="bin-row">
-        <BinConfigRow :bin="bin" :index="idx" @update="updateBin" />
-        <UButton size="sm" type="button" @click="removeBin(idx)">Remove</UButton>
+  <div class="bins-page">
+    <UCard>
+      <template #header>
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+          <h2 class="text-2xl font-bold">Manage Bins</h2>
+          <UButton
+            icon="i-heroicons-plus"
+            @click="addBin"
+            :loading="createBin.isPending.value"
+          >
+            Add Bin
+          </UButton>
+        </div>
+      </template>
+
+      <div v-if="binsQuery.isLoading.value" class="space-y-4">
+        <USkeleton v-for="i in 3" :key="i" class="h-20 w-full" />
       </div>
-      <UDivider />
-      <UButton class="primary" @click="addBin">Add Bin</UButton>
-    </div>
-  </UCard>
+
+      <div v-else-if="binsQuery.isError.value" class="text-center py-8">
+        <p class="text-red-500">Failed to load bins</p>
+        <UButton @click="binsQuery.refetch.value" class="mt-4">Retry</UButton>
+      </div>
+
+      <div v-else-if="bins.length === 0" class="text-center py-8">
+        <p class="text-gray-500 mb-4">No bins configured yet</p>
+        <UButton icon="i-heroicons-plus" @click="addBin">Add Your First Bin</UButton>
+      </div>
+
+      <div v-else ref="binsContainer" class="space-y-3">
+        <BinConfigRow
+          v-for="bin in bins"
+          :key="bin.id"
+          :bin="bin"
+          @update="updateBinData"
+          @delete="deleteBinConfirm"
+          @move-earlier="moveBinEarlier.mutate(bin.id)"
+          @move-later="moveBinLater.mutate(bin.id)"
+          :is-first="bin.position === 1"
+          :is-last="bin.position === bins.length"
+        />
+      </div>
+    </UCard>
+  </div>
 </template>
 
-<script lang="ts" setup>
-import { ref } from 'vue'
-import BinConfigRow from '../components/BinConfigRow.vue'
+<script setup lang="ts">
+import Sortable from 'sortablejs'
+import type { components } from '~/types/api'
 
-interface Bin {
-  name: string
-  color: string
-}
+type Bin = components['schemas']['Bin']
 
-// Stub: initial bins
-const bins = ref<Bin[]>([
-  { name: 'General Waste', color: '#444' },
-  { name: 'Recycling', color: '#2ecc40' },
-  { name: 'Garden', color: '#ffdc00' }
-])
+const { binsQuery } = useBinsQuery()
+const {
+  createBin,
+  updateBin,
+  deleteBin,
+  moveBinEarlier,
+  moveBinLater,
+  setBinPosition
+} = useBinMutations()
 
-function updateBin({ name, color, index }: { name: string; color: string; index: number }) {
-  bins.value[index].name = name
-  bins.value[index].color = color
-}
+const bins = computed(() => {
+  const items = binsQuery.data.value?.items || []
+  return [...items].sort((a, b) => a.position - b.position)
+})
+
+const binsContainer = ref<HTMLElement | null>(null)
+let sortableInstance: Sortable | null = null
+
+// Set up drag and drop for reordering bins
+// Use watchEffect to reinitialize when bins change (after mutations)
+watchEffect(() => {
+  // Ensure we're in the client environment and the container exists
+  if (!import.meta.client || !binsContainer.value) return
+
+  // Depend on bins to trigger reinit when data changes
+  const currentBins = bins.value
+  if (currentBins.length === 0) return
+
+  // Clean up previous instance
+  if (sortableInstance) {
+    sortableInstance.destroy()
+  }
+
+  // Wait for DOM to update before initializing
+  nextTick(() => {
+    if (!binsContainer.value) return
+
+    sortableInstance = Sortable.create(binsContainer.value, {
+      animation: 200,
+      handle: '.drag-handle',
+      ghostClass: 'sortable-ghost',
+      dragClass: 'sortable-drag',
+      onEnd: (event) => {
+        const { oldIndex, newIndex } = event
+
+        // Only update if position actually changed
+        if (oldIndex !== undefined && newIndex !== undefined && oldIndex !== newIndex) {
+
+          const movedBin = bins.value[oldIndex]
+          const newPosition = newIndex + 1 // Position is 1-based
+
+          // Update the backend with the new position
+          setBinPosition.mutate({
+            id: movedBin.id,
+            position: newPosition
+          })
+        }
+      },
+    })
+  })
+})
+
+// Clean up on unmount
+onBeforeUnmount(() => {
+  if (sortableInstance) {
+    sortableInstance.destroy()
+    sortableInstance = null
+  }
+})
 
 function addBin() {
-  bins.value.push({ name: 'New Bin', color: '#888' })
+  createBin.mutate({
+    name: 'New Bin',
+    colour: '#888888',
+  })
 }
 
-function removeBin(index: number) {
-  bins.value.splice(index, 1)
+function updateBinData(bin: Bin, data: { name?: string; colour?: string }) {
+  updateBin.mutate({
+    id: bin.id,
+    data,
+  })
 }
 
-// Stub: drag-and-drop reordering
-function moveBin(from: number, to: number) {
-  const bin = bins.value.splice(from, 1)[0]
-  bins.value.splice(to, 0, bin)
+function deleteBinConfirm(bin: Bin) {
+  if (confirm(`Are you sure you want to delete "${bin.name}"?`)) {
+    deleteBin.mutate(bin.id)
+  }
 }
 </script>
 
 <style scoped>
-.settings-card {
-  max-width: 600px;
-  margin: 2rem auto;
+.bins-page {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 0 0.5rem;
 }
-.bins-list {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
+
+@media (min-width: 640px) {
+  .bins-page {
+    padding: 0 1rem;
+  }
 }
-.bin-row {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
+
+/* Drag and drop styles */
+:deep(.sortable-ghost) {
+  opacity: 0.4;
+  background: rgb(243 244 246);
+}
+
+:deep(.dark .sortable-ghost) {
+  background: rgb(38 38 38);
+}
+
+:deep(.sortable-drag) {
+  opacity: 1;
+  cursor: grabbing !important;
+}
+
+/* Add smooth transitions for bins */
+:deep(.bin-config-row) {
+  transition: transform 0.2s ease, opacity 0.2s ease;
 }
 </style>

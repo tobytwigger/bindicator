@@ -12,6 +12,7 @@ from hardware.drivers.lcd import Lcd
 from hardware.drivers.lights import Lights
 from hardware.drivers.movement import Movement
 from hardware.drivers.buttons import Buttons
+from hardware.drivers.mqtt import MqttClient
 from hardware.screens.flash_messages.goodbye import GoodbyeScreen
 from hardware.screens.flash_messages.welcome import WelcomeScreen
 import logging
@@ -21,6 +22,17 @@ import threading
 from hardware.drivers.drivers import Drivers
 from hardware.drivers.inputs import Inputs
 from hardware.screens.abstract_screen import Screen, QuitApp
+
+# Configure logger to output all levels to stdout
+logger = logging.getLogger(__name__)
+if not logger.handlers:
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setLevel(logging.DEBUG)
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+    logger.setLevel(logging.DEBUG)
+
 
 should_kill = False
 
@@ -36,16 +48,19 @@ def run():
 
     set_up_gpio()
 
+    # Create MQTT client for publishing GPIO events
+    mqtt_client = MqttClient()
     drivers = Drivers(
         Lcd(),
         Lights(),
         Movement(),
         Buttons(),
+        mqtt_client,
     )
 
     inputs = Inputs(
         drivers,
-        120,
+        mqtt_client=mqtt_client,
     )
 
     screen = WelcomeScreen()
@@ -103,6 +118,9 @@ class AppRunner:
         self._schedule.every(1).minute.do(self._check_configuration)
         self._schedule.every(1).minute.do(self._check_settings)
 
+        # Start the input polling thread
+        self._inputs.start()
+
         while screen is not None:
             # Fire the on_enter event, so screens can set up schedules and show initial states
             screen.on_enter(self._schedule, self._drivers)
@@ -118,11 +136,13 @@ class AppRunner:
 
                     # Check if the app should quit
                     if should_kill or isinstance(result, QuitApp):
+                        screen.on_exit(self._drivers)
                         screen = None
                         break
 
                     # Check if a redirect is needed
                     if isinstance(result, Screen):
+                        screen.on_exit(self._drivers)
                         self._cleanup()
                         screen = result
                         break  # Break inner loop to transition to next_screen
@@ -136,11 +156,13 @@ class AppRunner:
 
                         # Check if the app should quit
                         if should_kill or isinstance(result, QuitApp):
+                            screen.on_exit(self._drivers)
                             screen = None
                             break
 
                         # Check if a redirect is needed
                         if isinstance(result, Screen):
+                            screen.on_exit(self._drivers)
                             self._cleanup()
                             screen = result
                             break  # Break inner loop to transition to next_screen
@@ -155,6 +177,9 @@ class AppRunner:
                     time.sleep(0.08)
 
             except KeyboardInterrupt:
+                if screen is not None:
+                    screen.on_exit(self._drivers)
+
                 # Do nothing
                 screen = None
 
@@ -183,6 +208,9 @@ class AppRunner:
             self._drivers.cleanup()
 
     def _quit(self):
+        # Stop the input polling thread
+        self._inputs.stop()
+
         if self._quitting_screen is not None:
             quitting_screen = self._quitting_screen
             self._quitting_screen = None

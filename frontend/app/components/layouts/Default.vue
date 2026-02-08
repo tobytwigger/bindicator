@@ -1,64 +1,147 @@
 <template>
     <UCard class="mt-10">
         <template #header>
-            <div class="flex justify-between">
+            <div class="flex justify-between items-center mb-4">
                 <span class="flex flex-row items-center space-x-2">
                     <div class="text-xl font-bold">The Bindicator</div>
                 </span>
                 <div class="flex space-x-2 flex-row">
-                    <UButton color="neutral" label="Change Home" to="/home"/>
-                    <ColorScheme>
-                        <USelect v-model="$colorMode.preference" :options="['system', 'light', 'dark']"/>
-                    </ColorScheme>
+                    <ClientOnly>
+                        <UButton
+                            :icon="themeIcon"
+                            color="neutral"
+                            variant="ghost"
+                            size="md"
+                            @click="cycleTheme"
+                            :aria-label="`Theme: ${colorMode.preference}`"
+                        />
+                    </ClientOnly>
                 </div>
             </div>
-            <div class="flex justify-between">
-                HELLO
-                <UTabs :items="tabItems" v-model="activeTab" class="border-b border-gray-200 dark:border-gray-800" />
+            <div class="tabs-container">
+                <UTabs :items="tabItems" v-model="activeTabIndex" :orientation="tabOrientation" class="tabs-full-width" />
             </div>
         </template>
         <slot/>
-        <!--      <UButton icon="i-heroicons-book-open" to="https://ui.nuxt.com" target="_blank">Open Nuxt UI Documentation</UButton>-->
     </UCard>
 </template>
 <script lang="ts" setup>
-import { ref, watch } from 'vue'
+import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-
-const links = [{
-    label: 'Bins',
-    icon: 'i-heroicons-trash',
-    to: '/bins'
-}, {
-    label: 'Schedule',
-    icon: 'i-heroicons-calendar',
-    to: '/schedule'
-}, {
-    label: 'Settings',
-    icon: 'i-heroicons-cog',
-    to: '/settings'
-}]
-
-const tabItems = links.map(link => ({
-    label: link.label,
-    icon: link.icon
-}))
 
 const router = useRouter()
 const route = useRoute()
-const activeTab = ref(links.findIndex(link => link.to === route.path) !== -1 ? links.findIndex(link => link.to === route.path) : 0)
+const colorMode = useColorMode()
 
-watch(() => route.path, (newPath) => {
-    const idx = links.findIndex(link => link.to === newPath)
-    if (idx !== -1) activeTab.value = idx
+// Track window width for responsive tabs
+const windowWidth = ref(1024)
+
+const updateWindowWidth = () => {
+    windowWidth.value = window.innerWidth
+}
+
+onMounted(() => {
+    windowWidth.value = window.innerWidth
+    window.addEventListener('resize', updateWindowWidth)
 })
 
-watch(activeTab, onTabChange)
+onUnmounted(() => {
+    window.removeEventListener('resize', updateWindowWidth)
+})
 
-function onTabChange(idx: number) {
-    if (links[idx] == undefined || links[idx].to === route.path) {
-        return
-    }
-    router.push(links[idx].to)
+// Responsive tabs orientation
+const tabOrientation = computed(() => {
+    return windowWidth.value < 640 ? 'vertical' : 'horizontal'
+})
+
+// Theme icon based on current preference
+const themeIcon = computed(() => {
+    const preference = colorMode.preference
+    if (preference === 'light') return 'i-heroicons-sun'
+    if (preference === 'dark') return 'i-heroicons-moon'
+    return 'i-heroicons-computer-desktop' // system
+})
+
+// Cycle through theme modes
+function cycleTheme() {
+    const modes = ['system', 'light', 'dark']
+    const currentIndex = modes.indexOf(colorMode.preference)
+    const nextIndex = (currentIndex + 1) % modes.length
+    colorMode.preference = modes[nextIndex]
 }
+
+const tabItems = [
+    {
+        label: 'Bins',
+        icon: 'i-heroicons-trash',
+        to: '/',
+        value: 0,
+        click: () => router.push('/')
+    },
+    {
+        label: 'Schedule',
+        icon: 'i-heroicons-calendar',
+        to: '/schedule',
+        value: 1,
+        click: () => router.push('/schedule')
+    },
+    {
+        label: 'Settings',
+        icon: 'i-heroicons-cog',
+        to: '/settings',
+        value: 2,
+        click: () => router.push('/settings')
+    }
+]
+
+// Track active tab value based on current route
+const activeTabIndex = computed({
+    get: () => {
+        const currentPath = route.path
+        const activeItem = tabItems.find(item => item.to === currentPath)
+        return activeItem ? activeItem.value : 0
+    },
+    set: (value) => {
+        // When user clicks a tab, find the corresponding item and navigate
+        const targetItem = tabItems.find(item => item.value === value)
+        if (targetItem && targetItem.to !== route.path) {
+            router.push(targetItem.to)
+        }
+    }
+})
 </script>
+
+<style scoped>
+.tabs-container {
+    width: 100%;
+}
+
+.tabs-full-width {
+    width: 100%;
+}
+
+.tabs-full-width :deep(.tabs) {
+    width: 100%;
+}
+
+.tabs-full-width :deep([role="tablist"]) {
+    width: 100%;
+}
+
+@media (max-width: 639px) {
+    .tabs-container {
+        margin-top: 0.5rem;
+    }
+
+    .tabs-full-width :deep([role="tablist"]) {
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+    }
+
+    .tabs-full-width :deep([role="tab"]) {
+        width: 100%;
+        justify-content: flex-start;
+    }
+}
+</style>

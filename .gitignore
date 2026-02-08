@@ -10,9 +10,5 @@ wheels/
 .venv
 
 frontend/node_modules
-old-frontend/node_modules
-old-frontend/.output
-old-frontend/.nuxt
-old-frontend/dist
 
 .idea

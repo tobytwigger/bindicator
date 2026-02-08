@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from typing import Optional, Any
+from typing import Optional, Any, List
 from core.database import models, schemas
 from sqlalchemy import func
 from datetime import datetime
@@ -223,6 +223,11 @@ class BinDayReplacementRepository:
         replacements = query.offset((page - 1) * per_page).limit(per_page).all()
         return [schemas.BinDayReplacement.model_validate(r) for r in replacements], total
 
+    def get_all(self) -> List[schemas.BinDayReplacement]:
+        query = self.db.query(models.BinDayReplacement).order_by(models.BinDayReplacement.id)
+
+        return [schemas.BinDayReplacement.model_validate(r) for r in query.all()]
+
     def get_by_id(self, replacement_id: int) -> Optional[schemas.BinDayReplacement]:
         db_replacement = self.db.query(models.BinDayReplacement).filter(models.BinDayReplacement.id == replacement_id).first()
         if not db_replacement:
@@ -258,6 +263,8 @@ class BinDayReplacementRepository:
         self.db.delete(db_replacement)
         self.db.commit()
         return True
+
+
 
 class SettingsRepository:
     def __init__(self, db: Session):

@@ -36,3 +36,4 @@ sudo systemctl start mosquitto
 #alembic upgrade head
 
 echo "Installation Complete! Access via http://$(hostname).local"
+

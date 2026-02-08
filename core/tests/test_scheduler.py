@@ -210,6 +210,7 @@ class TestGetAnyBinLastDueOut:
         # Before the first scheduled collection for any bin
         assert scheduler.get_collection_date_before(datetime.date(2025, 1, 1)) is None
 
+@freeze_time("2026-01-01 12:00:00")
 class TestGetBinsDueOutOn:
     def test_it_returns_the_bins_due_out_on_the_date(self, client, setup_db):
         db, bin_ids = setup_db
@@ -225,6 +226,7 @@ class TestGetBinsDueOutOn:
         bins_due = scheduler.get_bins_due_out_on(datetime.date(2025, 1, 1))
         assert bins_due == []
 
+@freeze_time("2026-01-01 12:00:00")
 class TestGetBinById:
     def test_it_returns_the_bin_with_the_given_id(self, client, setup_db):
         db, bin_ids = setup_db
@@ -238,6 +240,7 @@ class TestGetBinById:
         bin1 = scheduler.get_bin_by_id(999999)
         assert bin1 is None
 
+@freeze_time("2026-01-01 12:00:00")
 class TestGetBinByPosition:
     def test_it_returns_the_bin_with_the_given_position(self, client, setup_db):
         db, bin_ids = setup_db

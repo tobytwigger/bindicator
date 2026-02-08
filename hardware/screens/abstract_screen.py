@@ -11,6 +11,9 @@ class Screen(ABC):
     def on_enter(self, schedule: Scheduler, drivers: Drivers):
         pass
 
+    def on_exit(self, drivers: Drivers):
+        pass
+
     def tick(self, drivers) -> Screen | None | QuitApp:
         pass
 

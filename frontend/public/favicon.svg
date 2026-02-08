@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <!-- Background circle -->
+  <circle cx="32" cy="32" r="30" fill="#1e293b" opacity="0.95"/>
+
+  <!-- Blue bin (left) -->
+  <g transform="translate(12, 20)">
+    <rect x="2" y="6" width="10" height="14" rx="1" fill="#3b82f6"/>
+    <rect x="1" y="4" width="12" height="2.5" rx="0.5" fill="#60a5fa"/>
+    <rect x="4" y="10" width="4" height="1.5" rx="0.5" fill="#93c5fd" opacity="0.6"/>
+  </g>
+
+  <!-- Green bin (center-left) -->
+  <g transform="translate(22, 22)">
+    <rect x="2" y="6" width="10" height="14" rx="1" fill="#10b981"/>
+    <rect x="1" y="4" width="12" height="2.5" rx="0.5" fill="#34d399"/>
+    <rect x="4" y="10" width="4" height="1.5" rx="0.5" fill="#6ee7b7" opacity="0.6"/>
+  </g>
+
+  <!-- Yellow/Orange bin (center-right) -->
+  <g transform="translate(32, 20)">
+    <rect x="2" y="6" width="10" height="14" rx="1" fill="#f59e0b"/>
+    <rect x="1" y="4" width="12" height="2.5" rx="0.5" fill="#fbbf24"/>
+    <rect x="4" y="10" width="4" height="1.5" rx="0.5" fill="#fde68a" opacity="0.6"/>
+  </g>
+
+  <!-- Red bin (right) -->
+  <g transform="translate(42, 22)">
+    <rect x="2" y="6" width="10" height="14" rx="1" fill="#ef4444"/>
+    <rect x="1" y="4" width="12" height="2.5" rx="0.5" fill="#f87171"/>
+    <rect x="4" y="10" width="4" height="1.5" rx="0.5" fill="#fca5a5" opacity="0.6"/>
+  </g>
+</svg>

@@ -1,7 +1,9 @@
 <template>
   <div>
       <UContainer>
-          <NuxtPage />
+          <LayoutsDefault>
+              <NuxtPage />
+          </LayoutsDefault>
       </UContainer>
   </div>
 </template>

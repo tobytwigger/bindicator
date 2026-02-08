@@ -4,6 +4,7 @@ from core.database.database import get_db
 from core.database.schemas import Bin as BinSchema, BinCreate, BinEdit
 from backend.utils.pagination import PaginationResponse
 from core.database.repositories import BinRepository, PaginationOutOfRange
+from backend.utils.mqtt_publisher import publish_database_update
 
 router = APIRouter(
     prefix="/bins",
@@ -48,7 +49,9 @@ def create_bin(bin: BinCreate, repo: BinRepository = Depends(get_bin_repo)):
     """
     Create a new bin.
     """
-    return repo.create(bin)
+    result = repo.create(bin)
+    publish_database_update()
+    return result
 
 @router.post("/{bin_id}/move-earlier", response_model=BinSchema)
 def move_bin_earlier(bin_id: int, repo: BinRepository = Depends(get_bin_repo)):
@@ -58,6 +61,7 @@ def move_bin_earlier(bin_id: int, repo: BinRepository = Depends(get_bin_repo)):
     bin_obj = repo.move_bin_earlier(bin_id)
     if not bin_obj:
         raise HTTPException(status_code=400, detail="Cannot move bin earlier")
+    publish_database_update()
     return bin_obj
 
 @router.post("/{bin_id}/move-later", response_model=BinSchema)
@@ -68,6 +72,7 @@ def move_bin_later(bin_id: int, repo: BinRepository = Depends(get_bin_repo)):
     bin_obj = repo.move_bin_later(bin_id)
     if not bin_obj:
         raise HTTPException(status_code=400, detail="Cannot move bin later")
+    publish_database_update()
     return bin_obj
 
 @router.post("/{bin_id}/set-position", response_model=BinSchema)
@@ -78,6 +83,7 @@ def set_bin_position(bin_id: int, position: int = Query(..., ge=1), repo: BinRep
     bin_obj = repo.set_bin_position(bin_id, position)
     if not bin_obj:
         raise HTTPException(status_code=400, detail="Cannot set bin position")
+    publish_database_update()
     return bin_obj
 
 @router.patch("/{bin_id}", response_model=BinSchema)
@@ -88,6 +94,7 @@ def edit_bin(bin_id: int, bin_edit: BinEdit, repo: BinRepository = Depends(get_b
     bin_obj = repo.edit_bin(bin_id, bin_edit.name, bin_edit.colour)
     if not bin_obj:
         raise HTTPException(status_code=404, detail="Bin not found")
+    publish_database_update()
     return bin_obj
 
 @router.delete("/{bin_id}", status_code=204)
@@ -98,4 +105,5 @@ def delete_bin(bin_id: int, repo: BinRepository = Depends(get_bin_repo)):
     success = repo.delete_bin(bin_id)
     if not success:
         raise HTTPException(status_code=404, detail="Bin not found")
+    publish_database_update()
     return Response(status_code=204)

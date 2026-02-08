@@ -1,6 +1,7 @@
 from typing import List
 from contextlib import contextmanager
 import math
+import threading
 from core.database.database import SessionLocal
 from hardware.drivers.drivers import Drivers
 from hardware.drivers.lights import LightState
@@ -13,6 +14,9 @@ from core.database import models
 from hardware.screens.bins.single_bin_collection import SingleBinCollection
 from hardware.utils.date_format import format_date
 from hardware.screens.abstract_screen import Screen
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class BinCollections(Screen):
@@ -20,9 +24,48 @@ class BinCollections(Screen):
     def __init__(self):
         self._current_date = datetime.date.today()
         self._bin_collection_explorer = BinCollectionExplorer()
+        self._cache_lock = threading.Lock()  # Thread-safe access to cache
+        self._mqtt_subscribed = False  # Track subscription state
 
     def on_enter(self, schedule: Scheduler, drivers: Drivers):
+        # Subscribe to database update notifications via MQTT
+        if drivers.mqtt and not self._mqtt_subscribed:
+            try:
+                drivers.mqtt.subscribe("bindicator/database/updated",
+                                       lambda payload: self._on_database_updated(payload, drivers))
+                self._mqtt_subscribed = True
+                logger.info("BinCollections: Subscribed to database updates")
+            except Exception as e:
+                logger.warning(f"BinCollections: Failed to subscribe to MQTT: {e}")
+
         self._display_correct_outputs(drivers)
+
+    def on_exit(self, drivers):
+        """Clean up MQTT subscription when leaving the screen."""
+        if drivers.mqtt and self._mqtt_subscribed:
+            try:
+                drivers.mqtt.unsubscribe("bindicator/database/updated")
+                self._mqtt_subscribed = False
+                logger.info("BinCollections: Unsubscribed from database updates")
+            except Exception as e:
+                logger.warning(f"BinCollections: Failed to unsubscribe from MQTT: {e}")
+
+    def _on_database_updated(self, payload, drivers: Drivers):
+        """Thread-safe callback when database is updated via MQTT."""
+        logger.info("BinCollections: Database update notification received")
+        with self._cache_lock:
+            try:
+                self._bin_collection_explorer.clear_cache()
+                # Check the current date is still valid. If it isn't, go to today
+                is_current_date_still_collection_date = len(self._bin_collection_explorer.get_bins_due_out_on(self._current_date)) > 0
+                if not is_current_date_still_collection_date:
+                    self._current_date = datetime.date.today()
+
+                self._display_correct_outputs(drivers)
+                logger.debug("BinCollections: Cache refreshed after database update")
+            except Exception as e:
+                logger.error(f"BinCollections: Error refreshing cache: {e}")
+
 
     def handle_inputs(self, events: List[InputEvents], drivers: Drivers):
         # If we press both left and right, show the 'settings' screen
@@ -48,11 +91,6 @@ class BinCollections(Screen):
 
         if InputEvents.BIN_1_PRESSED in events or InputEvents.BIN_2_PRESSED in events or InputEvents.BIN_3_PRESSED in events or InputEvents.BIN_4_PRESSED in events:
             return SingleBinCollection.from_input_events(events)
-
-        return None
-
-    def tick(self, drivers) -> Screen | None | QuitApp:
-        self._display_correct_outputs(drivers)
 
         return None
 

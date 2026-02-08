@@ -4,6 +4,7 @@ from core.database.database import get_db
 from core.database import schemas
 from core.database.repositories import BinDayReplacementRepository, PaginationOutOfRange
 from backend.utils.pagination import PaginationResponse
+from backend.utils.mqtt_publisher import publish_database_update
 
 router = APIRouter(
     prefix="/bin_day_replacements",
@@ -42,6 +43,7 @@ def get_bin_day_replacement(replacement_id: int, repo: BinDayReplacementReposito
 @router.post("/", response_model=schemas.BinDayReplacement)
 def create_bin_day_replacement(replacement: schemas.BinDayReplacementCreate, repo: BinDayReplacementRepository = Depends(get_bin_day_replacement_repo)):
     created = repo.create(replacement)
+    publish_database_update()
     return created
 
 @router.patch("/{replacement_id}", response_model=schemas.BinDayReplacement)
@@ -49,6 +51,7 @@ def edit_bin_day_replacement(replacement_id: int, replacement_edit: dict, repo: 
     updated = repo.edit(replacement_id, replacement_edit)
     if not updated:
         raise HTTPException(status_code=404, detail="BinDayReplacement not found")
+    publish_database_update()
     return updated
 
 @router.delete("/{replacement_id}", status_code=204)
@@ -56,4 +59,5 @@ def delete_bin_day_replacement(replacement_id: int, repo: BinDayReplacementRepos
     deleted = repo.delete(replacement_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="BinDayReplacement not found")
+    publish_database_update()
     return Response(status_code=204)
