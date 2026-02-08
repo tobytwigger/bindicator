@@ -18,6 +18,7 @@ class DatabaseUpdatePublisher:
     BROKER_HOST = "localhost"
     BROKER_PORT = 1883
     UPDATE_TOPIC = "bindicator/database/updated"
+    SETTINGS_TOPIC = "bindicator/settings/updated"
     QOS = 0
 
     def __new__(cls):
@@ -88,6 +89,31 @@ class DatabaseUpdatePublisher:
         except Exception as e:
             logger.warning(f"DatabaseUpdatePublisher: Error publishing update: {e}")
 
+    def publish_settings_update(self):
+        """
+        Publish a settings update notification.
+        Silently fails if MQTT is not available.
+        """
+        if not self._client or not self._connected:
+            logger.debug("DatabaseUpdatePublisher: Not publishing settings update - MQTT not connected")
+            return
+
+        try:
+            message = {
+                "message": "settings_updated",
+                "timestamp": int(time.time())
+            }
+
+            result = self._client.publish(self.SETTINGS_TOPIC, json.dumps(message), qos=self.QOS)
+
+            if result.rc == mqtt.MQTT_ERR_SUCCESS:
+                logger.debug(f"DatabaseUpdatePublisher: Published settings update to {self.SETTINGS_TOPIC}")
+            else:
+                logger.warning(f"DatabaseUpdatePublisher: Failed to publish settings update")
+
+        except Exception as e:
+            logger.warning(f"DatabaseUpdatePublisher: Error publishing settings update: {e}")
+
     def cleanup(self):
         """Disconnect from MQTT broker."""
         if self._client:
@@ -106,3 +132,9 @@ _publisher = DatabaseUpdatePublisher()
 def publish_database_update():
     """Convenience function to publish database updates."""
     _publisher.publish_database_update()
+
+
+def publish_settings_update():
+    """Convenience function to publish settings updates."""
+    _publisher.publish_settings_update()
+

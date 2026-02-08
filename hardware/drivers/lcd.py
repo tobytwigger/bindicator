@@ -30,6 +30,8 @@ class Lcd:
         self._sleeping = False
         self._scrolling_thread = None
         self._quit_scrolling_thread = False
+        # State saved before sleeping
+        self._saved_state = None
 
     def _lcd_init_pins(self):
         GPIO.setup(self.LCD_E_PIN, GPIO.OUT)
@@ -42,6 +44,15 @@ class Lcd:
         GPIO.output(self.LCD_BACKLIGHT_TOGGLE_PIN, GPIO.HIGH)
 
     def display(self, line1, line2, style, prefix=None, suffix=None):
+        # Save the original (unpadded) state for wake restoration
+        self._saved_state = {
+            'line1': line1,
+            'line2': line2,
+            'style': style,
+            'prefix': prefix,
+            'suffix': suffix
+        }
+
         if self._sleeping:
             return
 
@@ -147,6 +158,20 @@ class Lcd:
         self._sleeping = False
         GPIO.output(self.LCD_BACKLIGHT_TOGGLE_PIN, GPIO.HIGH)
         self._lcd.cursor_mode = 'hide'
+
+        # Restore the saved state if it exists
+        if self._saved_state is not None:
+            # Clear the current state so display() will actually update
+            self._current_line_1 = None
+            self._current_line_2 = None
+            # Redisplay the saved content
+            self.display(
+                self._saved_state['line1'],
+                self._saved_state['line2'],
+                self._saved_state['style'],
+                self._saved_state['prefix'],
+                self._saved_state['suffix']
+            )
 
     def cleanup(self):
         if self._scrolling_thread is not None:

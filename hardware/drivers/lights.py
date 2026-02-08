@@ -62,6 +62,9 @@ class Lights:
         self._bin_3_led = LightController(self.POSITION_THREE_LED_PIN)
         self._bin_4_led = LightController(self.POSITION_FOUR_LED_PIN)
 
+        # State saved before sleeping
+        self._saved_light_state = None
+
         self.all_off()
 
 
@@ -73,7 +76,11 @@ class Lights:
         elif state == LightState.PHASE:
             controller.phase()
 
-    def set_lights(self, one: LightState, two: LightState, three: LightState, four: LightState):
+    def set_lights(self, one: LightState, two: LightState, three: LightState, four: LightState, save_state: bool = True):
+        # Save the state for wake restoration (save before checking sleep/cache)
+        if save_state:
+            self._saved_light_state = [one, two, three, four]
+
         if self._sleeping:
             return
 
@@ -107,20 +114,33 @@ class Lights:
     def sleep(self):
         if self._sleeping:
             return
-        self.all_off()
+        self.all_off(save_state = False)
         self._sleeping = True
 
     def wake(self):
-        if(not self._sleeping):
+        if not self._sleeping:
             return
+
         self._sleeping = False
+
+        # Restore the saved state if it exists
+        if self._saved_light_state is not None:
+            # Clear the current display cache so set_lights will actually update
+            self._current_display = None
+            # Restore the saved light state
+            self.set_lights(
+                self._saved_light_state[0],
+                self._saved_light_state[1],
+                self._saved_light_state[2],
+                self._saved_light_state[3]
+            )
 
     def cleanup(self):
         self._stop_phasing()
         self.all_off()
 
-    def all_off(self):
-        self.set_lights(LightState.OFF, LightState.OFF, LightState.OFF, LightState.OFF)
+    def all_off(self, save_state: bool = True):
+        self.set_lights(LightState.OFF, LightState.OFF, LightState.OFF, LightState.OFF, save_state)
 
     def _start_phasing(self):
         if self._phasing_thread is not None:

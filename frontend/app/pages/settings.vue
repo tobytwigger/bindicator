@@ -25,7 +25,7 @@
               <input
                 v-model.number="timeout"
                 type="range"
-                min="1"
+                min="10"
                 max="3600"
                 step="1"
                 class="flex-1"
@@ -34,7 +34,7 @@
               <UInput
                 v-model.number="timeout"
                 type="number"
-                min="1"
+                min="10"
                 max="3600"
                 class="w-24"
                 @blur="handleTimeoutChange"
@@ -42,7 +42,7 @@
             </div>
 
             <div class="flex justify-between text-sm text-gray-500">
-              <span>1 second</span>
+              <span>10 seconds</span>
               <span>1 hour (3600s)</span>
             </div>
           </div>
@@ -137,8 +137,8 @@ watch(() => settingsQuery.data.value, (data) => {
 const hasChanges = computed(() => timeout.value !== originalTimeout.value)
 
 function handleTimeoutChange() {
-  // Ensure timeout is within bounds
-  if (timeout.value < 1) timeout.value = 1
+  // Ensure timeout is within bounds (minimum 10 seconds, maximum 1 hour)
+  if (timeout.value < 10) timeout.value = 10
   if (timeout.value > 3600) timeout.value = 3600
 }
 

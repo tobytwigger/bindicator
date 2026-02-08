@@ -34,7 +34,10 @@ class Inputs:
 
     def __init__(self, drivers: Drivers, mqtt_client=None):
         self._drivers = drivers
-        self._movement_timeout = 120
+
+        # Load timeout from database with fallback to 120
+        self._movement_timeout = self._load_timeout_from_db()
+        self._timeout_lock = threading.Lock()  # Thread-safe access to timeout
 
         self._mqtt_client = mqtt_client
 
@@ -52,6 +55,37 @@ class Inputs:
         self._movement_lock = threading.Lock()
         self._movement_detected_at: Optional[float] = None
 
+    def _load_timeout_from_db(self) -> int:
+        """Load timeout value from database, fallback to 120 if unavailable."""
+        try:
+            from core.database.database import SessionLocal
+            from core.database.repositories import SettingsRepository
+
+            db = SessionLocal()
+            try:
+                settings_repo = SettingsRepository(db)
+                timeout = settings_repo.get_by_key("timeout")
+                logger.info(f"Loaded timeout from database: {timeout}s")
+                return timeout
+            finally:
+                db.close()
+        except Exception as e:
+            logger.warning(f"Failed to load timeout from database, using default 120s: {e}")
+            return 120
+
+    def update_timeout(self):
+        """Update timeout value from database. Called when settings are updated via MQTT."""
+        new_timeout = self._load_timeout_from_db()
+        with self._timeout_lock:
+            old_timeout = self._movement_timeout
+            self._movement_timeout = new_timeout
+            logger.info(f"Timeout updated: {old_timeout}s -> {new_timeout}s")
+
+    def _on_settings_updated(self, payload):
+        """Callback when settings are updated via MQTT."""
+        logger.info("Settings update notification received, refreshing timeout...")
+        self.update_timeout()
+
 
 
     def start(self):
@@ -66,6 +100,10 @@ class Inputs:
                 logger.info("Connecting to MQTT...")
                 self._mqtt_client.connect()
                 logger.info("MQTT connected successfully")
+
+                # Subscribe to settings updates
+                self._mqtt_client.subscribe("bindicator/settings/updated", self._on_settings_updated)
+                logger.info("Subscribed to settings updates")
             except Exception as e:
                 logger.warning(f"Failed to connect to MQTT broker: {e}")
                 logger.info("Continuing without MQTT support")
@@ -119,9 +157,12 @@ class Inputs:
         # This needs to be done here to maintain timing accuracy
         with self._movement_lock:
             if self._movement_detected_at is not None:
+                with self._timeout_lock:
+                    timeout = self._movement_timeout
                 time_elapsed = time.time() - self._movement_detected_at
-                if time_elapsed > self._movement_timeout:
-                    logger.info(f"Movement timeout reached ({time_elapsed:.1f}s > {self._movement_timeout}s)")
+                # print(f"Time since last movement in S: {time_elapsed:.1f}, timeout is {timeout}s")
+                if time_elapsed > timeout:
+                    logger.info(f"Movement timeout reached ({time_elapsed:.1f}s > {timeout}s)")
                     logger.debug("Movement stopped, enqueueing MOVEMENT_STOPPED")
                     events.append(InputEvents.MOVEMENT_STOPPED)
                     self._movement_detected_at = None

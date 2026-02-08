@@ -98,8 +98,29 @@ const tabItems = [
 const activeTabIndex = computed({
     get: () => {
         const currentPath = route.path
-        const activeItem = tabItems.find(item => item.to === currentPath)
-        return activeItem ? activeItem.value : 0
+
+        // Normalize paths by removing trailing slashes for comparison
+        const normalizePath = (path: string) => path.endsWith('/') && path.length > 1 ? path.slice(0, -1) : path
+        const normalizedCurrentPath = normalizePath(currentPath)
+
+
+        // Find exact match first
+        let activeItem = tabItems.find(item => {
+            const normalizedTo = normalizePath(item.to)
+            return normalizedTo === normalizedCurrentPath
+        })
+
+        // If no exact match and not on root, try matching by checking if route starts with the tab's path
+        if (!activeItem && currentPath !== '/') {
+            activeItem = tabItems.find(item => {
+                const normalizedTo = normalizePath(item.to)
+                return normalizedTo !== '/' && normalizedCurrentPath.startsWith(normalizedTo)
+            })
+        }
+
+        const result = activeItem ? activeItem.value : 0
+
+        return result
     },
     set: (value) => {
         // When user clicks a tab, find the corresponding item and navigate

@@ -93,9 +93,9 @@ class BinDayReplacement(BinDayReplacementBase):
 
 
 class SettingsBase(BaseModel):
-    timeout: int = Field(default=120, ge=1, le=3600)
+    timeout: int = Field(default=120, ge=10, le=3600)
 class SettingsEdit(BaseModel):
-    timeout: Optional[int] = Field(None, ge=1, le=3600)
+    timeout: Optional[int] = Field(None, ge=10, le=3600)
 
 
     model_config = {

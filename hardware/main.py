@@ -20,7 +20,7 @@ import time
 import schedule
 import threading
 from hardware.drivers.drivers import Drivers
-from hardware.drivers.inputs import Inputs
+from hardware.drivers.inputs import Inputs, InputEvents
 from hardware.screens.abstract_screen import Screen, QuitApp
 
 # Configure logger to output all levels to stdout
@@ -149,6 +149,12 @@ class AppRunner:
 
                     # Listen for any inputs
                     events = self._inputs.listen()
+
+                    # Handle driver sleep/wake events
+                    if InputEvents.MOVEMENT_STOPPED in events:
+                        self._drivers.sleep()
+                    elif InputEvents.MOVEMENT_DETECTED in events:
+                        self._drivers.wake()
 
                     # Pass the events to the screen
                     if len(events) > 0:
