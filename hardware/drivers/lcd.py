@@ -2,6 +2,9 @@ from threading import Thread
 from RPLCD.gpio import CharLCD
 import RPi.GPIO as GPIO
 import time
+from hardware.utils.logging_config import setup_logger
+
+logger = setup_logger('LCD DRIVER')
 
 class Lcd:
     LCD_E_PIN = 3
@@ -19,10 +22,14 @@ class Lcd:
     TEXT_STYLE_RIGHT = 'right'
 
     def __init__(self):
+        logger.info("Initializing LCD driver")
+        logger.debug("Initializing LCD GPIO pins")
         self._lcd_init_pins()
+        logger.debug(f"Creating CharLCD instance with pins: RS={Lcd.LCD_RS_PIN}, E={Lcd.LCD_E_PIN}, DATA=[{Lcd.LCD_D4_PIN}, {Lcd.LCD_D5_PIN}, {Lcd.LCD_D6_PIN}, {Lcd.LCD_D7_PIN}]")
         self._lcd = CharLCD(pin_rs=Lcd.LCD_RS_PIN, pin_e=Lcd.LCD_E_PIN, pins_data=[Lcd.LCD_D4_PIN, Lcd.LCD_D5_PIN, Lcd.LCD_D6_PIN, Lcd.LCD_D7_PIN],
                             cols=16, rows=2, numbering_mode=GPIO.BCM)
         self._lcd.cursor_mode = 'hide'
+        logger.debug("Clearing LCD display")
         self._lcd.clear()
         self._lcd.cursor_pos = (0, 0)
         self._current_line_1 = None
@@ -32,8 +39,10 @@ class Lcd:
         self._quit_scrolling_thread = False
         # State saved before sleeping
         self._saved_state = None
+        logger.info("LCD driver initialized successfully")
 
     def _lcd_init_pins(self):
+        logger.debug("Setting up LCD GPIO pins")
         GPIO.setup(self.LCD_E_PIN, GPIO.OUT)
         GPIO.setup(self.LCD_RS_PIN, GPIO.OUT)
         GPIO.setup(self.LCD_D4_PIN, GPIO.OUT)
@@ -42,6 +51,7 @@ class Lcd:
         GPIO.setup(self.LCD_D7_PIN, GPIO.OUT)
         GPIO.setup(self.LCD_BACKLIGHT_TOGGLE_PIN, GPIO.OUT)  # Backlight enable
         GPIO.output(self.LCD_BACKLIGHT_TOGGLE_PIN, GPIO.HIGH)
+        logger.debug("LCD GPIO pins configured, backlight enabled")
 
     def display(self, line1, line2, style, prefix=None, suffix=None):
         # Save the original (unpadded) state for wake restoration
@@ -54,7 +64,10 @@ class Lcd:
         }
 
         if self._sleeping:
+            logger.debug("Display called while sleeping, ignoring")
             return
+
+        logger.debug(f"Displaying: '{line1}' / '{line2}' (style={style}, prefix={prefix}, suffix={suffix})")
 
         # Add padding
         if style == self.TEXT_STYLE_LEFT:
@@ -139,28 +152,37 @@ class Lcd:
 
     def sleep(self):
         if self._sleeping:
+            logger.debug("Sleep called but already sleeping")
             return
+        logger.info("Putting LCD to sleep")
         self._lcd.clear()
         self._lcd.cursor_mode = 'hide'
         self._current_line_1 = None
         self._current_line_2 = None
 
         if self._scrolling_thread is not None:
+            logger.debug("Stopping scrolling thread")
             self._quit_scrolling_thread = True
             self._scrolling_thread.join()
 
+        logger.debug("Turning off backlight")
         GPIO.output(self.LCD_BACKLIGHT_TOGGLE_PIN, GPIO.LOW)
         self._sleeping = True
+        logger.info("LCD is now sleeping")
 
     def wake(self):
         if(not self._sleeping):
+            logger.debug("Wake called but already awake")
             return
+        logger.info("Waking LCD from sleep")
         self._sleeping = False
+        logger.debug("Turning on backlight")
         GPIO.output(self.LCD_BACKLIGHT_TOGGLE_PIN, GPIO.HIGH)
         self._lcd.cursor_mode = 'hide'
 
         # Restore the saved state if it exists
         if self._saved_state is not None:
+            logger.debug("Restoring saved display state")
             # Clear the current state so display() will actually update
             self._current_line_1 = None
             self._current_line_2 = None
@@ -172,10 +194,15 @@ class Lcd:
                 self._saved_state['prefix'],
                 self._saved_state['suffix']
             )
+        logger.info("LCD is now awake")
 
     def cleanup(self):
+        logger.info("Cleaning up LCD")
         if self._scrolling_thread is not None:
+            logger.debug("Stopping scrolling thread")
             self._quit_scrolling_thread = True
             self._scrolling_thread.join()
+        logger.debug("Clearing display")
         self._lcd.clear()
         self._lcd.cursor_mode = 'hide'
+        logger.info("LCD cleanup complete")

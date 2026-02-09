@@ -72,18 +72,18 @@ function cycleTheme() {
 
 const tabItems = [
     {
-        label: 'Bins',
-        icon: 'i-heroicons-trash',
+        label: 'Schedule',
+        icon: 'i-heroicons-calendar',
         to: '/',
         value: 0,
         click: () => router.push('/')
     },
     {
-        label: 'Schedule',
-        icon: 'i-heroicons-calendar',
-        to: '/schedule',
+        label: 'Bins',
+        icon: 'i-heroicons-trash',
+        to: '/bins',
         value: 1,
-        click: () => router.push('/schedule')
+        click: () => router.push('/bins')
     },
     {
         label: 'Settings',

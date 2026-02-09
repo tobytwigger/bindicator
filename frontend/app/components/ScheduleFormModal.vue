@@ -2,54 +2,60 @@
   <UModal v-model:open="isOpen" :title="editingSchedule ? 'Edit Schedule' : 'Add Schedule'">
     <template #body>
       <UForm :state="form" @submit="handleSubmit" class="space-y-4">
-        <div class="space-y-2">
-          <label class="block text-sm font-medium">
-            Bin <span class="text-red-500">*</span>
-          </label>
+        <UFormField
+          label="Bin"
+          description="Select which bin to add to the schedule"
+          required
+        >
           <USelect
             v-model="form.bin_id"
             :items="binOptions"
             placeholder="Select a bin"
           />
-        </div>
+        </UFormField>
 
-        <div class="space-y-2">
-          <label class="block text-sm font-medium">
-            Start Date <span class="text-red-500">*</span>
-          </label>
-          <UInput
-            v-model="form.start"
-            type="date"
-            required
+        <UFormField
+          label="Start Date"
+          description="When this schedule begins"
+          required
+        >
+          <UInputDate
+            v-model="startDateValue"
+            icon="i-heroicons-calendar"
           />
-        </div>
+        </UFormField>
 
-        <div class="space-y-2">
-          <label class="block text-sm font-medium">
-            End Date (Optional)
-          </label>
-          <UInput
-            v-model="form.end"
-            type="date"
+        <UFormField
+          label="End Date"
+          description="When this schedule ends (leave empty for ongoing)"
+          hint="Optional"
+        >
+          <UInputDate
+            v-model="endDateValue"
+            icon="i-heroicons-calendar"
           />
-        </div>
+        </UFormField>
 
-        <div class="space-y-2">
-          <label class="block text-sm font-medium">
-            Repeat Every (weeks) <span class="text-red-500">*</span>
-          </label>
-          <UInput
-            v-model.number="form.repeat_weeks"
-            type="number"
-            min="1"
-            required
-          />
-        </div>
+        <UFormField
+          label="Repeat Every"
+          description="How many weeks between each collection"
+          required
+        >
+          <div class="flex items-center gap-2">
+            <UInput
+              v-model.number="form.repeat_weeks"
+              type="number"
+              min="1"
+              class="w-24"
+            />
+            <span class="text-sm text-gray-600 dark:text-gray-400">week{{ form.repeat_weeks !== 1 ? 's' : '' }}</span>
+          </div>
+        </UFormField>
 
         <div class="flex gap-2 justify-between">
           <UButton
             v-if="editingSchedule"
-            color="red"
+            color="error"
             variant="ghost"
             icon="i-heroicons-trash"
             @click="handleDelete"
@@ -62,7 +68,7 @@
             <UButton color="neutral" variant="ghost" @click="handleCancel">
               Cancel
             </UButton>
-            <UButton type="submit" :loading="isSubmitting">
+            <UButton type="submit" :loading="isSubmitting" icon="i-heroicons-check">
               {{ editingSchedule ? 'Update' : 'Create' }}
             </UButton>
           </div>
@@ -74,7 +80,8 @@
 
 <script setup lang="ts">
 import { format } from 'date-fns'
-import type { components } from '../../types/api'
+import { CalendarDate, parseDate } from '@internationalized/date'
+import type { components } from '~/types/api'
 
 type Schedule = components['schemas']['Schedule']
 type Bin = components['schemas']['Bin']
@@ -113,6 +120,37 @@ const form = ref<ScheduleFormData>({
   start: '',
   end: '',
   repeat_weeks: 1,
+})
+
+// Helper function to convert string date to CalendarDate object
+function dateStringToCalendarDate(dateStr: string): CalendarDate | null {
+  if (!dateStr) return null
+  try {
+    return parseDate(dateStr)
+  } catch {
+    return null
+  }
+}
+
+// Helper function to convert CalendarDate object to string
+function calendarDateToString(date: CalendarDate | null | undefined): string {
+  if (!date) return ''
+  return `${date.year}-${String(date.month).padStart(2, '0')}-${String(date.day).padStart(2, '0')}`
+}
+
+// Computed properties for UInputDate
+const startDateValue = computed({
+  get: () => dateStringToCalendarDate(form.value.start),
+  set: (value: CalendarDate | null | undefined) => {
+    form.value.start = calendarDateToString(value)
+  }
+})
+
+const endDateValue = computed({
+  get: () => dateStringToCalendarDate(form.value.end),
+  set: (value: CalendarDate | null | undefined) => {
+    form.value.end = calendarDateToString(value)
+  }
 })
 
 const binOptions = computed(() =>

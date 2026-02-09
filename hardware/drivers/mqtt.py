@@ -1,13 +1,13 @@
 import paho.mqtt.client as mqtt
 import json
-import logging
 from typing import Optional, Dict, Callable
 from typing import TYPE_CHECKING
+from hardware.utils.logging_config import setup_logger
 
 if TYPE_CHECKING:
     from hardware.drivers.inputs import InputEvents
 
-logger = logging.getLogger(__name__)
+logger = setup_logger('MQTT')
 
 
 class MqttClient:
@@ -20,37 +20,46 @@ class MqttClient:
 
     def __init__(self):
         """Initialize MQTT client."""
+        logger.info("Initializing MQTT client")
         self._client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
         self._connected = False
         self._connection_error: Optional[Exception] = None
         self._subscriptions: Dict[str, Callable] = {}  # topic -> callback function
 
         # Set up callbacks
+        logger.debug("Setting up MQTT callbacks")
         self._client.on_connect = self._on_connect
         self._client.on_disconnect = self._on_disconnect
         self._client.on_message = self._on_message
+        logger.info("MQTT client initialized")
 
     def connect(self):
         """Connect to MQTT broker. Raises exception on failure."""
+        logger.info(f"Connecting to MQTT broker at {self.BROKER_HOST}:{self.BROKER_PORT}")
         try:
             self._client.connect(self.BROKER_HOST, self.BROKER_PORT, keepalive=60)
+            logger.debug("Starting MQTT client loop")
             self._client.loop_start()
 
             # Wait briefly for connection to establish
             import time
             timeout = 5
             start = time.time()
+            logger.debug(f"Waiting up to {timeout}s for connection to establish")
             while not self._connected and time.time() - start < timeout:
                 if self._connection_error:
+                    logger.error(f"Connection error detected: {self._connection_error}")
                     raise self._connection_error
                 time.sleep(0.1)
 
             if not self._connected:
-                raise ConnectionError(f"Failed to connect to MQTT broker at {self.BROKER_HOST}:{self.BROKER_PORT}")
+                error_msg = f"Failed to connect to MQTT broker at {self.BROKER_HOST}:{self.BROKER_PORT} within {timeout}s"
+                logger.error(error_msg)
+                raise ConnectionError(error_msg)
 
-            logger.info(f"Connected to MQTT broker at {self.BROKER_HOST}:{self.BROKER_PORT}")
+            logger.info(f"Successfully connected to MQTT broker at {self.BROKER_HOST}:{self.BROKER_PORT}")
         except Exception as e:
-            logger.error(f"MQTT connection failed: {e}")
+            logger.error(f"MQTT connection failed: {e}", exc_info=True)
             raise
 
     def disconnect(self):

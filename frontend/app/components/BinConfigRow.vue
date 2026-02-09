@@ -16,12 +16,22 @@
         @blur="emitUpdate"
         @keyup.enter="emitUpdate"
       />
-      <input
-        type="color"
-        v-model="localColour"
-        @change="emitUpdate"
-        class="color-picker"
-      />
+      <UPopover>
+        <UButton
+          :style="{ backgroundColor: localColour }"
+          class="color-button"
+          size="md"
+        >
+          <span class="sr-only">Choose color</span>
+        </UButton>
+        <template #content>
+          <UColorPicker
+            v-model="localColour"
+            format="hex"
+            @update:model-value="emitUpdate"
+          />
+        </template>
+      </UPopover>
     </div>
 
     <div class="bin-actions">
@@ -171,22 +181,31 @@ function emitUpdate() {
   }
 }
 
-.color-picker {
+.color-button {
   width: 60px;
   height: 38px;
-  border: 1px solid rgb(229 231 235);
+  border: 2px solid rgb(229 231 235);
   border-radius: 0.375rem;
   cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.color-button:hover {
+  border-color: rgb(156 163 175);
 }
 
 @media (max-width: 640px) {
-  .color-picker {
+  .color-button {
     width: 100%;
   }
 }
 
-.dark .color-picker {
-  border-color: rgb(38 38 38);
+.dark .color-button {
+  border-color: rgb(64 64 64);
+}
+
+.dark .color-button:hover {
+  border-color: rgb(115 115 115);
 }
 
 .bin-actions {

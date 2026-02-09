@@ -23,7 +23,9 @@ Base.metadata.create_all(bind=engine)
 def db():
     db = TestingSessionLocal()
     # Delete all existing data
+    db.query(models.BinPutOut).delete()
     db.query(models.Bin).delete()
+    db.query(models.BinDayReplacement).delete()
     db.query(models.Schedule).delete()
     db.commit()
 

@@ -2,7 +2,7 @@
 
 from pydantic import BaseModel
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Literal
 from pydantic import Field
 
 # class HomeBase(BaseModel):
@@ -92,10 +92,36 @@ class BinDayReplacement(BinDayReplacementBase):
     }
 
 
+class BinPutOutBase(BaseModel):
+    bin_id: int
+    date_put_out_at: datetime
+
+class BinPutOutCreate(BinPutOutBase):
+    pass
+
+class BinPutOut(BinPutOutBase):
+    id: int
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {
+        "from_attributes": True,
+    }
+
+
 class SettingsBase(BaseModel):
     timeout: int = Field(default=120, ge=10, le=3600)
+    put_out_day_before: bool = Field(default=False)
+    put_out_time: str = Field(default="17:00")
+    collection_time: str = Field(default="09:00")
+
+
+
 class SettingsEdit(BaseModel):
     timeout: Optional[int] = Field(None, ge=10, le=3600)
+    put_out_day_before: Optional[bool] = None
+    put_out_time: Optional[str] = None
+    collection_time: Optional[str] = Field(default="09:00")
 
 
     model_config = {
@@ -115,6 +141,9 @@ class CalendarBin(BaseModel):
     id: int
     name: str
     colour: Optional[str] = None
+    status: Literal['missed', 'taken_out', 'put_out_early', 'collected', 'due_out', 'not_yet_due']
+    put_out_date: Optional[str] = None  # ISO date format YYYY-MM-DD, only present if taken_out, put_out_early, or collected
+    put_out_id: Optional[int] = None  # ID of the put-out record, only present if taken_out, put_out_early, or collected
 
 class CalendarDate(BaseModel):
     date: str  # ISO date format YYYY-MM-DD

@@ -1,6 +1,6 @@
 # These are the database representation
 
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Date, ForeignKey, UniqueConstraint, JSON
+from sqlalchemy import Column, Integer, String, DateTime, Date, ForeignKey
 from sqlalchemy.orm import relationship
 from core.database.database import Base
 from sqlalchemy.sql import func
@@ -15,6 +15,7 @@ class Bin(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     schedules = relationship("Schedule", back_populates="bin", cascade="all, delete-orphan")
+    put_outs = relationship("BinPutOut", back_populates="bin", cascade="all, delete-orphan")
 
 class Schedule(Base):
     __tablename__ = "schedules"
@@ -38,8 +39,14 @@ class BinDayReplacement(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
-class Settings(Base):
-    __tablename__ = "settings"
-
+class BinPutOut(Base):
+    __tablename__ = "bin_put_outs"
     id = Column(Integer, primary_key=True, autoincrement=True)
-    timeout = Column(Integer, default=120)
+    bin_id = Column(Integer, ForeignKey("bins.id"), nullable=False)
+    date_put_out_at = Column(DateTime(timezone=True), nullable=False)
+
+    bin = relationship("Bin", back_populates="put_outs")
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+

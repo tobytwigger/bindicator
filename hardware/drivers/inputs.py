@@ -1,14 +1,12 @@
-from hardware.drivers.buttons import Buttons
-from hardware.drivers.movement import Movement
 import time
 from hardware.drivers.drivers import Drivers
 from enum import Enum
 import queue
 import threading
-import logging
 from typing import Optional
+from hardware.utils.logging_config import setup_logger
 
-logger = logging.getLogger(__name__)
+logger = setup_logger('INPUT HANDLER')
 
 # class syntax
 
@@ -58,17 +56,12 @@ class Inputs:
     def _load_timeout_from_db(self) -> int:
         """Load timeout value from database, fallback to 120 if unavailable."""
         try:
-            from core.database.database import SessionLocal
             from core.database.repositories import SettingsRepository
 
-            db = SessionLocal()
-            try:
-                settings_repo = SettingsRepository(db)
-                timeout = settings_repo.get_by_key("timeout")
-                logger.info(f"Loaded timeout from database: {timeout}s")
-                return timeout
-            finally:
-                db.close()
+            settings_repo = SettingsRepository()
+            timeout = settings_repo.get_by_key("timeout")
+            logger.info(f"Loaded timeout from database: {timeout}s")
+            return timeout
         except Exception as e:
             logger.warning(f"Failed to load timeout from database, using default 120s: {e}")
             return 120
@@ -160,7 +153,7 @@ class Inputs:
                 with self._timeout_lock:
                     timeout = self._movement_timeout
                 time_elapsed = time.time() - self._movement_detected_at
-                # print(f"Time since last movement in S: {time_elapsed:.1f}, timeout is {timeout}s")
+
                 if time_elapsed > timeout:
                     logger.info(f"Movement timeout reached ({time_elapsed:.1f}s > {timeout}s)")
                     logger.debug("Movement stopped, enqueueing MOVEMENT_STOPPED")

@@ -2,33 +2,33 @@
   <UModal v-model:open="isOpen" :title="editingReplacement ? 'Edit Bin Day Replacement' : 'Add Bin Day Replacement'">
     <template #body>
       <UForm :state="form" @submit="handleSubmit" class="space-y-4">
-        <div class="space-y-2">
-          <label class="block text-sm font-medium">
-            Original Collection Date <span class="text-red-500">*</span>
-          </label>
-          <UInput
-            v-model="form.replace"
-            type="date"
-            required
+        <UFormField
+          label="Original Collection Date"
+          description="The scheduled collection date to replace"
+          required
+        >
+          <UInputDate
+            v-model="replaceDateValue"
+            icon="i-heroicons-calendar"
           />
-        </div>
+        </UFormField>
 
-        <div class="space-y-2">
-          <label class="block text-sm font-medium">
-            New Collection Date <span class="text-red-500">*</span>
-          </label>
-          <UInput
-            v-model="form.replace_with"
-            type="date"
-            required
+        <UFormField
+          label="New Collection Date"
+          description="The new date when bins will be collected instead"
+          required
+        >
+          <UInputDate
+            v-model="replaceWithDateValue"
+            icon="i-heroicons-calendar"
           />
-        </div>
+        </UFormField>
 
-        <div class="flex gap-2 justify-end">
+        <div class="flex gap-2 justify-end pt-2">
           <UButton color="neutral" variant="ghost" @click="handleCancel">
             Cancel
           </UButton>
-          <UButton type="submit" :loading="isSubmitting">
+          <UButton type="submit" :loading="isSubmitting" icon="i-heroicons-check">
             {{ editingReplacement ? 'Update' : 'Create' }}
           </UButton>
         </div>
@@ -38,7 +38,8 @@
 </template>
 
 <script setup lang="ts">
-import type { components } from '../../types/api'
+import { CalendarDate, parseDate } from '@internationalized/date'
+import type { components } from '~/types/api'
 
 type BinDayReplacement = components['schemas']['BinDayReplacement']
 
@@ -69,6 +70,37 @@ const isOpen = computed({
 const form = ref<ReplacementFormData>({
   replace: '',
   replace_with: '',
+})
+
+// Helper function to convert string date to CalendarDate object
+function dateStringToCalendarDate(dateStr: string): CalendarDate | null {
+  if (!dateStr) return null
+  try {
+    return parseDate(dateStr)
+  } catch {
+    return null
+  }
+}
+
+// Helper function to convert CalendarDate object to string
+function calendarDateToString(date: CalendarDate | null | undefined): string {
+  if (!date) return ''
+  return `${date.year}-${String(date.month).padStart(2, '0')}-${String(date.day).padStart(2, '0')}`
+}
+
+// Computed properties for UInputDate
+const replaceDateValue = computed({
+  get: () => dateStringToCalendarDate(form.value.replace),
+  set: (value: CalendarDate | null | undefined) => {
+    form.value.replace = calendarDateToString(value)
+  }
+})
+
+const replaceWithDateValue = computed({
+  get: () => dateStringToCalendarDate(form.value.replace_with),
+  set: (value: CalendarDate | null | undefined) => {
+    form.value.replace_with = calendarDateToString(value)
+  }
 })
 
 // Watch for editing replacement changes to update form

@@ -13,6 +13,7 @@ dependencies = [
     "alembic>=1.18.3",
     "pydantic>=2.12.5",
     "paho-mqtt>=2.1.0",
+    "python-dotenv>=1.0.0",
 ]
 
 [dependency-groups]

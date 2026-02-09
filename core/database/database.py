@@ -1,8 +1,18 @@
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import declarative_base
 from sqlalchemy.orm import sessionmaker
+import os
+import sys
+from pathlib import Path
+from dotenv import load_dotenv
+import os
 
-SQLALCHEMY_DATABASE_URL = "sqlite+pysqlite:////home/toby/data/database.sqlite"
+root_dir = Path(__file__).resolve().parents[2]
+sys.path.append(str(root_dir))
+
+load_dotenv(dotenv_path=root_dir / ".env")
+
+SQLALCHEMY_DATABASE_URL = f"sqlite+pysqlite:///{os.getenv("DATABASE_FILE_PATH")}"
 
 # 'check_same_thread' is only needed for SQLite
 engine = create_engine(

@@ -1,13 +1,12 @@
 <template>
-  <div>
-      <UContainer>
-          <LayoutsDefault>
-              <NuxtPage />
-          </LayoutsDefault>
-      </UContainer>
-  </div>
+  <UApp>
+    <UContainer>
+      <LayoutsDefault>
+        <NuxtPage />
+      </LayoutsDefault>
+    </UContainer>
+  </UApp>
 </template>
-
 
 <script setup lang="ts">
 

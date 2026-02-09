@@ -1,4 +1,7 @@
 import RPi.GPIO as GPIO
+from hardware.utils.logging_config import setup_logger
+
+logger = setup_logger('BUTTONS DRIVER')
 
 class Buttons:
 
@@ -11,12 +14,15 @@ class Buttons:
     BIN_4_PIN = 21
 
     def __init__(self):
+        logger.info("Initializing Buttons driver")
+        logger.debug("Setting up button GPIO pins as inputs with pull-down resistors")
         GPIO.setup(self.LEFT_BUTTON_PIN, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
         GPIO.setup(self.RIGHT_BUTTON_PIN, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
         GPIO.setup(self.BIN_1_PIN, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
         GPIO.setup(self.BIN_2_PIN, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
         GPIO.setup(self.BIN_3_PIN, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
         GPIO.setup(self.BIN_4_PIN, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
+        logger.info("Buttons driver initialized successfully")
 
     def is_left_pressed(self):
         return GPIO.input(self.LEFT_BUTTON_PIN) == GPIO.HIGH

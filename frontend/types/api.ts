@@ -160,6 +160,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/schedules/calendar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Load Calendar
+         * @description Get computed bin collection dates within a date range.
+         *     Considers schedules and bin day replacements.
+         */
+        get: operations["load_calendar_schedules_calendar_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/schedules/{schedule_id}": {
         parameters: {
             query?: never;
@@ -269,6 +290,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/bin-put-outs/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Bin Put Outs
+         * @description Get a paginated list of bin put out records.
+         */
+        get: operations["get_bin_put_outs_bin_put_outs__get"];
+        put?: never;
+        /**
+         * Create Bin Put Out
+         * @description Create a new bin put out record.
+         */
+        post: operations["create_bin_put_out_bin_put_outs__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/bin-put-outs/by-date": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Bin Put Outs By Date
+         * @description Get all bins put out on a specific date.
+         */
+        get: operations["get_bin_put_outs_by_date_bin_put_outs_by_date_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/bin-put-outs/{put_out_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Bin Put Out
+         * @description Get a bin put out record by its ID.
+         */
+        get: operations["get_bin_put_out_bin_put_outs__put_out_id__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete Bin Put Out
+         * @description Delete a bin put out record by its ID.
+         */
+        delete: operations["delete_bin_put_out_bin_put_outs__put_out_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -346,6 +435,61 @@ export interface components {
             /** Colour */
             colour?: string | null;
         };
+        /** BinPutOut */
+        BinPutOut: {
+            /** Bin Id */
+            bin_id: number;
+            /**
+             * Date Put Out At
+             * Format: date-time
+             */
+            date_put_out_at: string;
+            /** Id */
+            id: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** BinPutOutCreate */
+        BinPutOutCreate: {
+            /** Bin Id */
+            bin_id: number;
+            /**
+             * Date Put Out At
+             * Format: date-time
+             */
+            date_put_out_at: string;
+        };
+        /** CalendarBin */
+        CalendarBin: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Colour */
+            colour?: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "missed" | "taken_out" | "due_out" | "not_yet_due";
+            /** Put Out Date */
+            put_out_date?: string | null;
+        };
+        /** CalendarDate */
+        CalendarDate: {
+            /** Date */
+            date: string;
+            /** Bins */
+            bins: components["schemas"]["CalendarBin"][];
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -355,6 +499,17 @@ export interface components {
         PaginationResponse_BinDayReplacement_: {
             /** Items */
             items: components["schemas"]["BinDayReplacement"][];
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Per Page */
+            per_page: number;
+        };
+        /** PaginationResponse[BinPutOut] */
+        PaginationResponse_BinPutOut_: {
+            /** Items */
+            items: components["schemas"]["BinPutOut"][];
             /** Total */
             total: number;
             /** Page */
@@ -442,11 +597,35 @@ export interface components {
              * @default 120
              */
             timeout: number;
+            /**
+             * Put Out Day Before
+             * @default false
+             */
+            put_out_day_before: boolean;
+            /**
+             * Put Out Time
+             * @default 17:00
+             */
+            put_out_time: string;
+            /**
+             * Collection Time
+             * @default 09:00
+             */
+            collection_time: string;
         };
         /** SettingsEdit */
         SettingsEdit: {
             /** Timeout */
             timeout?: number | null;
+            /** Put Out Day Before */
+            put_out_day_before?: boolean | null;
+            /** Put Out Time */
+            put_out_time?: string | null;
+            /**
+             * Collection Time
+             * @default 09:00
+             */
+            collection_time: string | null;
         };
         /** ValidationError */
         ValidationError: {
@@ -806,6 +985,40 @@ export interface operations {
             };
         };
     };
+    load_calendar_schedules_calendar_get: {
+        parameters: {
+            query: {
+                /** @description Start date (YYYY-MM-DD) */
+                start: string;
+                /** @description End date (YYYY-MM-DD) */
+                end: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalendarDate"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_schedule_schedules__schedule_id__get: {
         parameters: {
             query?: never;
@@ -1122,6 +1335,163 @@ export interface operations {
             header?: never;
             path: {
                 key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_bin_put_outs_bin_put_outs__get: {
+        parameters: {
+            query?: {
+                page?: number;
+                per_page?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginationResponse_BinPutOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_bin_put_out_bin_put_outs__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BinPutOutCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BinPutOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_bin_put_outs_by_date_bin_put_outs_by_date_get: {
+        parameters: {
+            query: {
+                /** @description Date in YYYY-MM-DD format */
+                date: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BinPutOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_bin_put_out_bin_put_outs__put_out_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                put_out_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BinPutOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_bin_put_out_bin_put_outs__put_out_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                put_out_id: number;
             };
             cookie?: never;
         };

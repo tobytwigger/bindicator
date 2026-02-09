@@ -11,6 +11,9 @@ from hardware.screens.abstract_screen import Screen, QuitApp
 from dataclasses import dataclass
 import threading
 import socket
+from hardware.utils.logging_config import setup_logger
+
+logger = setup_logger('INTERNET SCREEN')
 
 @dataclass
 class InternetStatus:
@@ -26,8 +29,10 @@ def ping_internet(host="8.8.8.8", port=53, timeout=3):
     try:
         socket.setdefaulttimeout(timeout)
         socket.socket(socket.AF_INET, socket.SOCK_STREAM).connect((host, port))
+        logger.debug(f"Internet ping successful to {host}:{port}")
         return True
     except socket.error as ex:
+        logger.debug(f"Internet ping failed to {host}:{port}: {ex}")
         return False
 
 class Internet(Screen):
@@ -39,12 +44,14 @@ class Internet(Screen):
     ]
 
     def __init__(self):
+        logger.info("Internet screen created")
         self.selected_option: int = 0
         self.is_loading: bool = False
         self.internet_status: InternetStatus | None = None
         self._status_thread: threading.Thread | None = None
 
     def on_enter(self, schedule: Scheduler, drivers: Drivers):
+        logger.info("Entering Internet screen")
         self._start_status_check()
         self._update_screen(drivers)
         drivers.lights.set_lights(LightState.OFF, LightState.OFF, LightState.OFF, LightState.OFF)
@@ -57,6 +64,7 @@ class Internet(Screen):
             else:
                 self.selected_option = len(self.options) - 1
 
+            logger.debug(f"Left button pressed, selected option: {self.options[self.selected_option]}")
             self._update_screen(drivers)
 
         if InputEvents.RIGHT_BUTTON_PRESSED in events:
@@ -65,9 +73,11 @@ class Internet(Screen):
             else:
                 self.selected_option = 0
 
+            logger.debug(f"Right button pressed, selected option: {self.options[self.selected_option]}")
             self._update_screen(drivers)
 
         if InputEvents.LEFT_BUTTON_PRESSED in events and InputEvents.RIGHT_BUTTON_PRESSED in events:
+            logger.info(f"Both buttons pressed, activating option: {self.options[self.selected_option]}")
             return self._activate_option()
 
         return None
@@ -76,37 +86,50 @@ class Internet(Screen):
         self._update_screen(drivers)
 
     def _start_status_check(self):
+        logger.info("Starting internet status check in background thread")
         self.is_loading = True
         self.internet_status = None
 
         def check_status():
+            logger.debug("Status check thread started")
             # Simulate status check (replace with real check)
             from subprocess import check_output
             ssid = None
 
-            scan_output = check_output(["iwlist", "wlan0", "scan"])
-            scan_output = scan_output.decode("utf-8", errors="ignore")
+            try:
+                logger.debug("Scanning for WiFi networks")
+                scan_output = check_output(["iwlist", "wlan0", "scan"])
+                scan_output = scan_output.decode("utf-8", errors="ignore")
 
-            for line in scan_output.splitlines():
-                line = line.strip()
-                if line.startswith("ESSID"):
-                    # Example line: ESSID:"MyNetwork"
-                    parts = line.split('"')
-                    if len(parts) > 1:
-                        ssid = parts[1]
+                for line in scan_output.splitlines():
+                    line = line.strip()
+                    if line.startswith("ESSID"):
+                        # Example line: ESSID:"MyNetwork"
+                        parts = line.split('"')
+                        if len(parts) > 1:
+                            ssid = parts[1]
+                            logger.debug(f"Found SSID: {ssid}")
+                            break
+            except Exception as e:
+                logger.error(f"Error scanning WiFi: {e}", exc_info=True)
 
+            logger.debug("Checking internet connectivity")
             has_internet_access = ping_internet()
 
             if ssid is None:
+                logger.info("No WiFi network detected, status: Disconnected")
                 self.internet_status = InternetStatus(
                     status="Disconnected",
                 )
-
-            self.internet_status = InternetStatus(
-                status="Connected" if has_internet_access else "No Internet",
-                ssid=ssid
-            )
+            else:
+                status_str = "Connected" if has_internet_access else "No Internet"
+                logger.info(f"WiFi status: {status_str}, SSID: {ssid}")
+                self.internet_status = InternetStatus(
+                    status=status_str,
+                    ssid=ssid
+                )
             self.is_loading = False
+            logger.debug("Status check complete")
 
         self._status_thread = threading.Thread(target=check_status, daemon=True)
         self._status_thread.start()
@@ -134,6 +157,7 @@ class Internet(Screen):
 
     def _activate_option(self) -> Screen | None | QuitApp:
         if self.options[self.selected_option] == "Back":
+            logger.info("Navigating back to Settings screen")
             from hardware.screens.settings.settings import Settings
 
             return Settings()

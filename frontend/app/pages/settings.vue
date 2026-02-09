@@ -14,45 +14,95 @@
         <UButton @click="() => { settingsQuery.refetch() }" class="mt-4">Retry</UButton>
       </div>
 
-      <div v-else class="space-y-6">
-        <div class="space-y-4">
-          <label class="block text-sm font-medium">Display Timeout (seconds)</label>
-          <p class="text-sm text-gray-500 dark:text-gray-400">
-            The screen will turn off after {{ timeout }} seconds of inactivity
-          </p>
-          <div class="space-y-4">
-            <div class="flex items-center gap-4">
-              <input
-                v-model.number="timeout"
-                type="range"
-                min="10"
-                max="3600"
-                step="1"
-                class="flex-1"
-                @change="handleTimeoutChange"
-              />
-              <UInput
-                v-model.number="timeout"
-                type="number"
-                min="10"
-                max="3600"
-                class="w-24"
-                @blur="handleTimeoutChange"
-              />
-            </div>
+      <div v-else class="space-y-8">
+        <!-- Display Settings Section -->
+        <div>
+          <div class="flex items-center gap-2 mb-4">
+            <UIcon name="i-heroicons-computer-desktop" class="text-xl" />
+            <h3 class="text-lg font-semibold">Display Settings</h3>
+          </div>
 
-            <div class="flex justify-between text-sm text-gray-500">
-              <span>10 seconds</span>
-              <span>1 hour (3600s)</span>
+          <UFormField
+            label="Display Timeout"
+            description="The screen will turn off after this period of inactivity"
+            help="Choose between 10 seconds and 1 hour"
+          >
+            <div class="space-y-3">
+              <USlider
+                v-model="timeout"
+                :min="10"
+                :max="3600"
+                :step="1"
+                tooltip
+              />
+              <div class="flex justify-between text-xs text-gray-500 dark:text-gray-400">
+                <span>10 seconds</span>
+                <span class="font-medium">{{ formatTimeout(timeout) }}</span>
+                <span>1 hour</span>
+              </div>
             </div>
+          </UFormField>
+        </div>
+
+        <!-- Bin Collection Reminders Section -->
+        <div class="pt-6 border-t border-gray-200 dark:border-gray-800">
+          <div class="flex items-center gap-2 mb-4">
+            <UIcon name="i-heroicons-bell-alert" class="text-xl" />
+            <h3 class="text-lg font-semibold">Bin Collection Reminders</h3>
+          </div>
+
+          <div class="space-y-6">
+            <!-- Put out time -->
+            <UFormField
+              label="Time you put bins out"
+              description="Set when you typically put bins out for collection"
+            >
+              <div class="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                <USelect
+                  v-model="putOutDayOption"
+                  :items="[
+                    { label: 'Day before collection', value: 'before' },
+                    { label: 'On collection day', value: 'same' }
+                  ]"
+                  class="w-full sm:w-56"
+                  size="md"
+                />
+                <span class="text-sm text-gray-600 dark:text-gray-400">at</span>
+                <UInputTime
+                  v-model="putOutTimeValue"
+                  icon="i-heroicons-clock"
+                  class="w-full sm:w-40"
+                  size="md"
+                />
+              </div>
+            </UFormField>
+
+            <!-- Collection time -->
+            <UFormField
+              label="Collection time"
+              description="When bins are typically collected on collection day"
+            >
+              <div class="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                <span class="text-sm text-gray-600 dark:text-gray-400">On collection day at</span>
+                <UInputTime
+                  v-model="collectionTimeValue"
+                  icon="i-heroicons-clock"
+                  class="w-full sm:w-40"
+                  size="md"
+                />
+              </div>
+            </UFormField>
           </div>
         </div>
 
-        <div class="pt-4 border-t border-gray-200 dark:border-gray-800">
+        <!-- Save Button -->
+        <div class="pt-6 border-t border-gray-200 dark:border-gray-800 flex justify-end">
           <UButton
             @click="saveSettings"
             :loading="updateSettings.isPending.value"
             :disabled="!hasChanges"
+            icon="i-heroicons-check"
+            size="lg"
           >
             Save Changes
           </UButton>
@@ -63,7 +113,10 @@
     <!-- Test Hardware Section -->
     <UCard class="mt-6">
       <template #header>
-        <h3 class="text-xl font-bold">Test Hardware</h3>
+        <div class="flex items-center gap-2">
+          <UIcon name="i-heroicons-cpu-chip" class="text-xl" />
+          <h3 class="text-xl font-bold">Test Hardware</h3>
+        </div>
       </template>
 
       <div class="space-y-4">
@@ -79,7 +132,10 @@
     <!-- Remote Hardware Control Section -->
     <UCard class="mt-6">
       <template #header>
-        <h3 class="text-xl font-bold">Remote Hardware Control</h3>
+        <div class="flex items-center gap-2">
+          <UIcon name="i-heroicons-command-line" class="text-xl" />
+          <h3 class="text-xl font-bold">Remote Hardware Control</h3>
+        </div>
       </template>
 
       <div class="space-y-4">
@@ -120,34 +176,117 @@
 </template>
 
 <script setup lang="ts">
+import { Time } from '@internationalized/date'
+
 const { settingsQuery } = useSettingsQuery()
 const { updateSettings } = useSettingsMutations()
 
 const timeout = ref(120)
 const originalTimeout = ref(120)
+const putOutDayBefore = ref(false)
+const originalPutOutDayBefore = ref(false)
+
+// Store the string values for API communication
+const putOutTimeString = ref('17:00')
+const originalPutOutTimeString = ref('17:00')
+const collectionTimeString = ref('08:00')
+const originalCollectionTimeString = ref('08:00')
+
+// Helper function to convert string time to Time object
+function timeStringToTimeValue(timeStr: string | undefined | null): Time {
+  if (!timeStr) {
+    return new Time(0, 0)
+  }
+  const parts = timeStr.split(':')
+  if (parts.length !== 2) {
+    return new Time(0, 0)
+  }
+  const [hours, minutes] = parts.map(Number)
+  return new Time(hours || 0, minutes || 0)
+}
+
+// Helper function to convert Time object to string
+function timeValueToString(time: Time | null | undefined): string {
+  if (!time) return '00:00'
+  const hours = String(time.hour).padStart(2, '0')
+  const minutes = String(time.minute).padStart(2, '0')
+  return `${hours}:${minutes}`
+}
+
+// Computed properties for UInputTime (converts string to Time object)
+const putOutTimeValue = computed({
+  get: () => timeStringToTimeValue(putOutTimeString.value),
+  set: (value: Time | null | undefined) => {
+    putOutTimeString.value = timeValueToString(value)
+  }
+})
+
+const collectionTimeValue = computed({
+  get: () => timeStringToTimeValue(collectionTimeString.value),
+  set: (value: Time | null | undefined) => {
+    collectionTimeString.value = timeValueToString(value)
+  }
+})
+
+// Computed property for the dropdown (converts boolean to 'before'/'same')
+const putOutDayOption = computed({
+  get: () => putOutDayBefore.value ? 'before' : 'same',
+  set: (value: string) => {
+    putOutDayBefore.value = value === 'before'
+  }
+})
 
 // Watch for settings data changes
 watch(() => settingsQuery.data.value, (data) => {
   if (data) {
     timeout.value = data.timeout
     originalTimeout.value = data.timeout
+    putOutDayBefore.value = data.put_out_day_before
+    originalPutOutDayBefore.value = data.put_out_day_before
+    putOutTimeString.value = data.put_out_time
+    originalPutOutTimeString.value = data.put_out_time
+    collectionTimeString.value = data.collection_time
+    originalCollectionTimeString.value = data.collection_time
   }
 }, { immediate: true })
 
-const hasChanges = computed(() => timeout.value !== originalTimeout.value)
+const hasChanges = computed(() =>
+  timeout.value !== originalTimeout.value ||
+  putOutDayBefore.value !== originalPutOutDayBefore.value ||
+  putOutTimeString.value !== originalPutOutTimeString.value ||
+  collectionTimeString.value !== originalCollectionTimeString.value
+)
 
-function handleTimeoutChange() {
-  // Ensure timeout is within bounds (minimum 10 seconds, maximum 1 hour)
-  if (timeout.value < 10) timeout.value = 10
-  if (timeout.value > 3600) timeout.value = 3600
+function formatTimeout(seconds: number): string {
+  if (seconds < 60) {
+    return `${seconds} seconds`
+  } else if (seconds < 3600) {
+    const minutes = Math.floor(seconds / 60)
+    return `${minutes} minute${minutes !== 1 ? 's' : ''}`
+  } else {
+    const hours = Math.floor(seconds / 3600)
+    const minutes = Math.floor((seconds % 3600) / 60)
+    if (minutes === 0) {
+      return `${hours} hour${hours !== 1 ? 's' : ''}`
+    }
+    return `${hours} hour${hours !== 1 ? 's' : ''} ${minutes} minute${minutes !== 1 ? 's' : ''}`
+  }
 }
 
 function saveSettings() {
   updateSettings.mutate(
-    { timeout: timeout.value },
+    {
+      timeout: timeout.value,
+      put_out_day_before: putOutDayBefore.value,
+      put_out_time: putOutTimeString.value,
+      collection_time: collectionTimeString.value
+    },
     {
       onSuccess: () => {
         originalTimeout.value = timeout.value
+        originalPutOutDayBefore.value = putOutDayBefore.value
+        originalPutOutTimeString.value = putOutTimeString.value
+        originalCollectionTimeString.value = collectionTimeString.value
       },
     }
   )
@@ -158,38 +297,6 @@ function saveSettings() {
 .settings-page {
   max-width: 800px;
   margin: 0 auto;
-}
-
-input[type="range"] {
-  -webkit-appearance: none;
-  appearance: none;
-  height: 6px;
-  border-radius: 3px;
-  background: rgb(229 231 235);
-  outline: none;
-}
-
-.dark input[type="range"] {
-  background: rgb(38 38 38);
-}
-
-input[type="range"]::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: rgb(132 204 22);
-  cursor: pointer;
-}
-
-input[type="range"]::-moz-range-thumb {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: rgb(132 204 22);
-  cursor: pointer;
-  border: none;
 }
 </style>
 

@@ -11,6 +11,9 @@ export interface CalendarBin {
   id: number
   name: string
   colour: string
+  status: 'missed' | 'taken_out' | 'put_out_early' | 'collected' | 'due_out' | 'not_yet_due'
+  put_out_date?: string | null
+  put_out_id?: number | null
 }
 
 export interface CalendarDate {
@@ -66,13 +69,13 @@ export function useScheduleMutations() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['schedules'] })
       queryClient.invalidateQueries({ queryKey: ['calendar'] })
-      toast.add({ title: 'Schedule created successfully', color: 'green' })
+      toast.add({ title: 'Schedule created successfully', color: 'success' })
     },
     onError: (error: any) => {
       toast.add({
         title: 'Failed to create schedule',
         description: error.detail || 'An error occurred',
-        color: 'red'
+        color: 'error'
       })
     },
   })
@@ -95,13 +98,13 @@ export function useScheduleMutations() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['schedules'] })
       queryClient.invalidateQueries({ queryKey: ['calendar'] })
-      toast.add({ title: 'Schedule updated successfully', color: 'green' })
+      toast.add({ title: 'Schedule updated successfully', color: 'success' })
     },
     onError: (error: any) => {
       toast.add({
         title: 'Failed to update schedule',
         description: error.detail || 'An error occurred',
-        color: 'red'
+        color: 'error'
       })
     },
   })

@@ -4,6 +4,9 @@ from core.database import models, schemas
 from sqlalchemy import func
 from datetime import datetime
 from sqlalchemy import or_
+import os
+
+from hardware.drivers.inputs import InputEvents
 
 
 class PaginationOutOfRange(Exception):
@@ -114,6 +117,28 @@ class BinRepository:
         for idx, bin_obj in enumerate(bins):
             bin_obj.position = idx + 1
         self.db.commit()
+
+    def get_by_position(self, bin_position: int) -> Optional[schemas.Bin]:
+        db_bin = self.db.query(models.Bin).filter(models.Bin.position == bin_position).first()
+        if not db_bin:
+            return None
+        return schemas.Bin.model_validate(db_bin)
+
+    def get_by_button_press(self, buttons: List["InputEvents"]) -> models.Bin | None:
+        bin_position = None
+        if InputEvents.BIN_1_PRESSED in buttons:
+            bin_position = 1
+        elif InputEvents.BIN_2_PRESSED in buttons:
+            bin_position = 2
+        elif InputEvents.BIN_3_PRESSED in buttons:
+            bin_position = 3
+        elif InputEvents.BIN_4_PRESSED in buttons:
+            bin_position = 4
+
+        if bin_position is None:
+            return None
+
+        return self.get_by_position(bin_position)
 
 class ScheduleRepository:
     def __init__(self, db: Session):
@@ -265,61 +290,209 @@ class BinDayReplacementRepository:
         return True
 
 
-
-class SettingsRepository:
+class BinPutOutRepository:
     def __init__(self, db: Session):
         self.db = db
 
-    def get_settings_row(self) -> models.Settings:
-        settings = self.db.query(models.Settings).first()
-        if not settings:
-            settings = models.Settings()
-            self.db.add(settings)
-            self.db.commit()
-            self.db.refresh(settings)
-        # Ensure all fields are set, using defaults if missing
-        for field, model_field in schemas.SettingsBase.model_fields.items():
-            if getattr(settings, field, None) is None:
-                setattr(settings, field, model_field.default)
-        return settings
+    def _parse_datetime(self, value):
+        if value is None:
+            return None
+        if isinstance(value, datetime):
+            return value
+        if isinstance(value, str):
+            try:
+                return datetime.strptime(value, "%Y-%m-%d")
+            except ValueError:
+                return datetime.strptime(value, "%Y-%m-%dT%H:%M:%S")
+        return value
+
+    def paginate(self, page: int, per_page: int) -> tuple[list[schemas.BinPutOut], int]:
+        query = self.db.query(models.BinPutOut).order_by(models.BinPutOut.date_put_out_at.desc(), models.BinPutOut.id.desc())
+        total = query.count()
+        if page > 1 and (page - 1) * per_page >= total:
+            raise PaginationOutOfRange()
+        put_outs = query.offset((page - 1) * per_page).limit(per_page).all()
+        return [schemas.BinPutOut.model_validate(p) for p in put_outs], total
+
+    def get_by_id(self, put_out_id: int) -> Optional[schemas.BinPutOut]:
+        db_put_out = self.db.query(models.BinPutOut).filter(models.BinPutOut.id == put_out_id).first()
+        if not db_put_out:
+            return None
+        return schemas.BinPutOut.model_validate(db_put_out)
+
+    def get_all(self) -> List[schemas.BinPutOut]:
+        """Get all bin put out records."""
+        query = self.db.query(models.BinPutOut).order_by(models.BinPutOut.date_put_out_at.desc(), models.BinPutOut.id.desc())
+        return [schemas.BinPutOut.model_validate(p) for p in query.all()]
+
+    def get_by_date(self, date) -> list[schemas.BinPutOut]:
+        """Get all bins put out on a specific date (matches any time on that date)."""
+        target_date = self._parse_datetime(date)
+        if target_date:
+            target_date = target_date.date() if hasattr(target_date, 'date') else target_date
+
+        # Since date_put_out_at is now DateTime, we need to filter by date range
+        from sqlalchemy import and_
+        start_of_day = datetime.combine(target_date, datetime.min.time())
+        end_of_day = datetime.combine(target_date, datetime.max.time())
+
+        db_put_outs = self.db.query(models.BinPutOut).filter(
+            and_(
+                models.BinPutOut.date_put_out_at >= start_of_day,
+                models.BinPutOut.date_put_out_at <= end_of_day
+            )
+        ).order_by(models.BinPutOut.id).all()
+
+        return [schemas.BinPutOut.model_validate(p) for p in db_put_outs]
+
+    def create(self, put_out_data: schemas.BinPutOutCreate) -> schemas.BinPutOut:
+        # Check bin exists
+        bin = self.db.query(models.Bin).filter(models.Bin.id == put_out_data.bin_id).first()
+        if not bin:
+            raise ValueError("Bin not found")
+
+        db_put_out = models.BinPutOut(
+            bin_id=put_out_data.bin_id,
+            date_put_out_at=self._parse_datetime(put_out_data.date_put_out_at)
+        )
+        self.db.add(db_put_out)
+        self.db.commit()
+        self.db.refresh(db_put_out)
+        return schemas.BinPutOut.model_validate(db_put_out)
+
+    def delete(self, put_out_id: int) -> bool:
+        db_put_out = self.db.query(models.BinPutOut).filter(models.BinPutOut.id == put_out_id).first()
+        if not db_put_out:
+            return False
+        self.db.delete(db_put_out)
+        self.db.commit()
+        return True
+
+
+
+class SettingsRepository:
+    SETTINGS_FILE_PATH = None  # Can be set by tests or will be loaded from env
+
+    def __init__(self):
+        """Initialize settings repository with JSON file backend."""
+        # Get the settings file path from class attribute (for tests) or environment variable
+        if self.SETTINGS_FILE_PATH is None:
+            self.SETTINGS_FILE_PATH = os.getenv(
+                "SETTINGS_FILE_PATH",
+                os.path.expanduser("~/.config/bindicator/settings.json")
+            )
+        self._ensure_settings_directory()
+
+    def _ensure_settings_directory(self):
+        """Ensure the settings directory exists, raise clear error if it cannot be created."""
+        import os
+
+        directory = os.path.dirname(self.SETTINGS_FILE_PATH)
+        if not os.path.exists(directory):
+            try:
+                os.makedirs(directory, exist_ok=True)
+            except PermissionError:
+                raise PermissionError(
+                    f"Cannot create settings directory '{directory}'. "
+                    f"Please ensure the directory exists and has proper permissions."
+                )
+            except Exception as e:
+                raise RuntimeError(
+                    f"Failed to create settings directory '{directory}': {e}"
+                )
+
+    def _load_settings_from_file(self) -> dict:
+        """Load settings from JSON file, return defaults if file doesn't exist."""
+        import json
+        import os
+
+        if not os.path.exists(self.SETTINGS_FILE_PATH):
+            # Return defaults if file doesn't exist
+            return {field: model_field.default
+                    for field, model_field in schemas.SettingsBase.model_fields.items()}
+
+        try:
+            with open(self.SETTINGS_FILE_PATH, 'r') as f:
+                content = f.read()
+                # Handle empty files
+                if not content:
+                    return {field: model_field.default
+                           for field, model_field in schemas.SettingsBase.model_fields.items()}
+                settings_data = json.loads(content)
+
+            # Ensure all fields are set, using defaults if missing
+            defaults = {field: model_field.default
+                       for field, model_field in schemas.SettingsBase.model_fields.items()}
+            defaults.update(settings_data)
+            return defaults
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Settings file '{self.SETTINGS_FILE_PATH}' contains invalid JSON: {e}")
+        except PermissionError:
+            raise PermissionError(f"Cannot read settings file '{self.SETTINGS_FILE_PATH}'. Check file permissions.")
+        except Exception as e:
+            raise RuntimeError(f"Failed to load settings from '{self.SETTINGS_FILE_PATH}': {e}")
+
+    def _save_settings_to_file(self, settings_dict: dict):
+        """Save settings to JSON file with file locking to prevent concurrent write issues."""
+        import json
+        import fcntl
+        import os
+
+        try:
+            # Open file for writing, create if doesn't exist
+            with open(self.SETTINGS_FILE_PATH, 'w') as f:
+                # Acquire exclusive lock
+                fcntl.flock(f.fileno(), fcntl.LOCK_EX)
+                try:
+                    json.dump(settings_dict, f, indent=2)
+                    f.flush()
+                    os.fsync(f.fileno())
+                finally:
+                    # Release lock
+                    fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+        except PermissionError:
+            raise PermissionError(f"Cannot write to settings file '{self.SETTINGS_FILE_PATH}'. Check file permissions.")
+        except Exception as e:
+            raise RuntimeError(f"Failed to save settings to '{self.SETTINGS_FILE_PATH}': {e}")
 
     def get_by_key(self, key: str) -> Any:
-        db_settings = self.get_settings_row()
+        """Get a specific setting by key."""
+        settings_dict = self._load_settings_from_file()
 
-        if hasattr(db_settings, key):
-            return getattr(db_settings, key)
+        if key in settings_dict:
+            return settings_dict[key]
 
         raise KeyError(f"Setting '{key}' not found")
 
     def get_all(self) -> schemas.SettingsBase:
-        settings_row = self.get_settings_row()
-        # Convert SQLAlchemy model to dict for Pydantic
-        settings_dict = {field: getattr(settings_row, field) for field in schemas.SettingsBase.model_fields}
+        """Get all settings."""
+        settings_dict = self._load_settings_from_file()
         return schemas.SettingsBase.model_validate(settings_dict)
 
     def create_or_update(self, settings_data: schemas.SettingsEdit) -> schemas.SettingsBase:
-        db_settings = self.get_settings_row()
+        """Create or update settings."""
+        # Load current settings
+        settings_dict = self._load_settings_from_file()
 
+        # Update only the fields that were set
         for field in settings_data.model_fields_set:
-            if hasattr(db_settings, field):
-                setattr(db_settings, field, getattr(settings_data, field))
+            if field in schemas.SettingsBase.model_fields:
+                settings_dict[field] = getattr(settings_data, field)
 
-        self.db.commit()
-        self.db.refresh(db_settings)
+        # Save to file
+        self._save_settings_to_file(settings_dict)
 
-        # Convert SQLAlchemy model to dict for Pydantic
-        settings_dict = {field: getattr(db_settings, field) for field in schemas.SettingsBase.model_fields}
         return schemas.SettingsBase.model_validate(settings_dict)
 
-    def delete_by_key(self, key):
-        db_settings = self.get_settings_row()
+    def delete_by_key(self, key: str):
+        """Delete a setting by key (reset to default)."""
+        settings_dict = self._load_settings_from_file()
 
-        if hasattr(db_settings, key):
+        if key in schemas.SettingsBase.model_fields:
             # Reset to default as defined in schema
             default_value = schemas.SettingsBase.model_fields[key].default
-            setattr(db_settings, key, default_value)
+            settings_dict[key] = default_value
 
-            self.db.commit()
-            self.db.refresh(db_settings)
+            self._save_settings_to_file(settings_dict)
         else:
             raise KeyError(f"Setting '{key}' not found")

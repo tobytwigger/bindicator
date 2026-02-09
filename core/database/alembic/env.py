@@ -4,10 +4,22 @@ from sqlalchemy import engine_from_config
 from sqlalchemy import pool
 
 from alembic import context
+import os
+from pathlib import Path
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+root_dir = Path(__file__).resolve().parents[3]
+load_dotenv(dotenv_path=root_dir / ".env")
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
+
+# Override the sqlalchemy.url from environment variable if set
+database_path = os.getenv("DATABASE_FILE_PATH")
+if database_path:
+    config.set_main_option("sqlalchemy.url", f"sqlite+pysqlite:///{database_path}")
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
@@ -16,7 +28,7 @@ if config.config_file_name is not None:
 
 # Alembic Integration
 from core.database.database import Base
-from core.database.models import Bin, Schedule, BinDayReplacement
+from core.database.models import Bin, Schedule, BinDayReplacement, BinPutOut
 
 # add your model's MetaData object here
 # for 'autogenerate' support
