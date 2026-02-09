@@ -8,6 +8,7 @@ from typing import List
 from datetime import datetime
 from core.scheduler.scheduler import BinCollectionExplorer
 from backend.utils.mqtt_publisher import publish_database_update
+from core.scheduler.schemas import BinCollection
 
 # Define the router
 router = APIRouter(
@@ -41,7 +42,7 @@ def list_schedules(
     )
 
 
-@router.get('/calendar', response_model=List[schemas.CalendarDate])
+@router.get('/calendar', response_model=List[BinCollection])
 def load_calendar(
         start: str = Query(..., description="Start date (YYYY-MM-DD)"),
         end: str = Query(..., description="End date (YYYY-MM-DD)"),
@@ -61,10 +62,9 @@ def load_calendar(
         raise HTTPException(status_code=400, detail="Start date must be before or equal to end date")
 
     # Use BinCollectionExplorer to get calendar data
-    explorer = BinCollectionExplorer(db=db)
-    calendar_data = explorer.get_calendar(start_date, end_date)
+    explorer = BinCollectionExplorer(db)
 
-    return calendar_data
+    return explorer.get_items_as_dict(start_date, end_date)
 
 
 @router.get("/{schedule_id}", response_model=schemas.Schedule)

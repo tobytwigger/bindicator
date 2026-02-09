@@ -479,9 +479,11 @@ export interface components {
              * Status
              * @enum {string}
              */
-            status: "missed" | "taken_out" | "due_out" | "not_yet_due";
+            status: "missed" | "taken_out" | "put_out_early" | "collected" | "due_out" | "not_yet_due";
             /** Put Out Date */
             put_out_date?: string | null;
+            /** Put Out Id */
+            put_out_id?: number | null;
         };
         /** CalendarDate */
         CalendarDate: {
@@ -590,8 +592,8 @@ export interface components {
             /** Repeat Weeks */
             repeat_weeks?: number | null;
         };
-        /** SettingsBase */
-        SettingsBase: {
+        /** Settings */
+        Settings: {
             /**
              * Timeout
              * @default 120
@@ -1291,7 +1293,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SettingsBase"];
+                    "application/json": components["schemas"]["Settings"];
                 };
             };
         };
@@ -1315,7 +1317,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SettingsBase"];
+                    "application/json": components["schemas"]["Settings"];
                 };
             };
             /** @description Validation Error */

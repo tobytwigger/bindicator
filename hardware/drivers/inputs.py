@@ -20,6 +20,22 @@ class InputEvents(Enum):
     BIN_3_PRESSED = 7
     BIN_4_PRESSED = 8
 
+    def get_button_position(self) -> int | None:
+
+        if self == InputEvents.BIN_1_PRESSED:
+            return 1
+        elif self == InputEvents.BIN_2_PRESSED:
+            return 2
+        elif self == InputEvents.BIN_3_PRESSED:
+            return 3
+        elif self == InputEvents.BIN_4_PRESSED:
+            return 4
+
+        return None
+
+    def is_bin_press(self) -> bool:
+        return self in [InputEvents.BIN_1_PRESSED, InputEvents.BIN_2_PRESSED, InputEvents.BIN_3_PRESSED, InputEvents.BIN_4_PRESSED]
+
 class Inputs:
     # Debounce interval for button presses (seconds)
     DEBOUNCE_INTERVAL = 0.3

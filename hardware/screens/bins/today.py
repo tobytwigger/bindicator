@@ -77,11 +77,20 @@ class Today(Screen):
         if InputEvents.BIN_1_PRESSED in events or InputEvents.BIN_2_PRESSED in events or InputEvents.BIN_3_PRESSED in events or InputEvents.BIN_4_PRESSED in events:
             logger.info("A bin button has been pressed")
             # If any bins are pressed, we need to see what the status of that bin is. If it's actionable, 'prime' the bin!
+            filtered_events = [e for e in events if e.is_bin_press()]
+            event = filtered_events[0] if len(filtered_events) > 0 else None
+
+            if event is None:
+                logger.warning("No bin press events found in events: " + str(events))
+                return None
+
+            logger.debug(f"Bin button {event} pressed, filtered from {len(events)}")
 
             # Load the bin that was pressed
             db = SessionLocal()
             bin_repo = BinRepository(db)
-            bin = bin_repo.get_by_button_press(events)
+
+            bin = bin_repo.get_by_position(event.get_button_position())
             db.close()
             if bin is None:
                 logger.info("No bin found for button presses: " + str(events))

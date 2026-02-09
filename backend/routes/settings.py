@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, Response
-from core.database.schemas import SettingsBase as SettingsSchema, SettingsEdit
+from core.database.schemas import Settings as SettingsSchema, SettingsEdit
 from core.database.repositories import SettingsRepository
 from backend.utils.mqtt_publisher import publish_settings_update
 

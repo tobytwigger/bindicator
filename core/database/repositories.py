@@ -6,8 +6,6 @@ from datetime import datetime
 from sqlalchemy import or_
 import os
 
-from hardware.drivers.inputs import InputEvents
-
 
 class PaginationOutOfRange(Exception):
     pass
@@ -123,22 +121,6 @@ class BinRepository:
         if not db_bin:
             return None
         return schemas.Bin.model_validate(db_bin)
-
-    def get_by_button_press(self, buttons: List["InputEvents"]) -> models.Bin | None:
-        bin_position = None
-        if InputEvents.BIN_1_PRESSED in buttons:
-            bin_position = 1
-        elif InputEvents.BIN_2_PRESSED in buttons:
-            bin_position = 2
-        elif InputEvents.BIN_3_PRESSED in buttons:
-            bin_position = 3
-        elif InputEvents.BIN_4_PRESSED in buttons:
-            bin_position = 4
-
-        if bin_position is None:
-            return None
-
-        return self.get_by_position(bin_position)
 
 class ScheduleRepository:
     def __init__(self, db: Session):
@@ -409,7 +391,7 @@ class SettingsRepository:
         if not os.path.exists(self.SETTINGS_FILE_PATH):
             # Return defaults if file doesn't exist
             return {field: model_field.default
-                    for field, model_field in schemas.SettingsBase.model_fields.items()}
+                    for field, model_field in schemas.Settings.model_fields.items()}
 
         try:
             with open(self.SETTINGS_FILE_PATH, 'r') as f:
@@ -417,12 +399,12 @@ class SettingsRepository:
                 # Handle empty files
                 if not content:
                     return {field: model_field.default
-                           for field, model_field in schemas.SettingsBase.model_fields.items()}
+                           for field, model_field in schemas.Settings.model_fields.items()}
                 settings_data = json.loads(content)
 
             # Ensure all fields are set, using defaults if missing
             defaults = {field: model_field.default
-                       for field, model_field in schemas.SettingsBase.model_fields.items()}
+                       for field, model_field in schemas.Settings.model_fields.items()}
             defaults.update(settings_data)
             return defaults
         except json.JSONDecodeError as e:
@@ -464,33 +446,33 @@ class SettingsRepository:
 
         raise KeyError(f"Setting '{key}' not found")
 
-    def get_all(self) -> schemas.SettingsBase:
+    def get_all(self) -> schemas.Settings:
         """Get all settings."""
         settings_dict = self._load_settings_from_file()
-        return schemas.SettingsBase.model_validate(settings_dict)
+        return schemas.Settings.model_validate(settings_dict)
 
-    def create_or_update(self, settings_data: schemas.SettingsEdit) -> schemas.SettingsBase:
+    def create_or_update(self, settings_data: schemas.SettingsEdit) -> schemas.Settings:
         """Create or update settings."""
         # Load current settings
         settings_dict = self._load_settings_from_file()
 
         # Update only the fields that were set
         for field in settings_data.model_fields_set:
-            if field in schemas.SettingsBase.model_fields:
+            if field in schemas.Settings.model_fields:
                 settings_dict[field] = getattr(settings_data, field)
 
         # Save to file
         self._save_settings_to_file(settings_dict)
 
-        return schemas.SettingsBase.model_validate(settings_dict)
+        return schemas.Settings.model_validate(settings_dict)
 
     def delete_by_key(self, key: str):
         """Delete a setting by key (reset to default)."""
         settings_dict = self._load_settings_from_file()
 
-        if key in schemas.SettingsBase.model_fields:
+        if key in schemas.Settings.model_fields:
             # Reset to default as defined in schema
-            default_value = schemas.SettingsBase.model_fields[key].default
+            default_value = schemas.Settings.model_fields[key].default
             settings_dict[key] = default_value
 
             self._save_settings_to_file(settings_dict)

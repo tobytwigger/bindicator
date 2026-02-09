@@ -1,6 +1,6 @@
 import paho.mqtt.client as mqtt
 import json
-from typing import Optional, Dict, Callable
+from typing import Optional, Callable
 from typing import TYPE_CHECKING
 from hardware.utils.logging_config import setup_logger
 
@@ -24,7 +24,7 @@ class MqttClient:
         self._client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
         self._connected = False
         self._connection_error: Optional[Exception] = None
-        self._subscriptions: Dict[str, Callable] = {}  # topic -> callback function
+        self._subscriptions: dict[str, Callable] = {}  # topic -> callback function
 
         # Set up callbacks
         logger.debug("Setting up MQTT callbacks")

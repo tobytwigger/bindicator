@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
 import type { components } from '~/types/api'
 
-type Settings = components['schemas']['SettingsBase']
+type Settings = components['schemas']['Settings']
 type SettingsEdit = components['schemas']['SettingsEdit']
 
 export function useSettingsQuery() {

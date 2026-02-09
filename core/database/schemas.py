@@ -109,7 +109,7 @@ class BinPutOut(BinPutOutBase):
     }
 
 
-class SettingsBase(BaseModel):
+class Settings(BaseModel):
     timeout: int = Field(default=120, ge=10, le=3600)
     put_out_day_before: bool = Field(default=False)
     put_out_time: str = Field(default="17:00")
