@@ -46,7 +46,6 @@ def list_schedules(
 def load_calendar(
         start: str = Query(..., description="Start date (YYYY-MM-DD)"),
         end: str = Query(..., description="End date (YYYY-MM-DD)"),
-        db: Session = Depends(get_db)
 ):
     """
     Get computed bin collection dates within a date range.
@@ -62,7 +61,7 @@ def load_calendar(
         raise HTTPException(status_code=400, detail="Start date must be before or equal to end date")
 
     # Use BinCollectionExplorer to get calendar data
-    explorer = BinCollectionExplorer(db)
+    explorer = BinCollectionExplorer()
 
     return explorer.get_items_as_dict(start_date, end_date)
 

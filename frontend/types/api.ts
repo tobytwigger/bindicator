@@ -383,6 +383,37 @@ export interface components {
              */
             updated_at: string;
         };
+        /** BinCollection */
+        BinCollection: {
+            /** Bin Id */
+            bin_id: number;
+            /** Bin Name */
+            bin_name: string;
+            /** Bin Colour */
+            bin_colour: string | null;
+            /** Bin Position */
+            bin_position: number;
+            /**
+             * Due Out At
+             * Format: date-time
+             */
+            due_out_at: string;
+            /**
+             * Collection Due At
+             * Format: date-time
+             */
+            collection_due_at: string;
+            /** Taken Out At */
+            taken_out_at: string | null;
+            /** Put Out Id */
+            put_out_id: number | null;
+            status: components["schemas"]["BinCollectionStatus"];
+        };
+        /**
+         * BinCollectionStatus
+         * @enum {string}
+         */
+        BinCollectionStatus: "missed" | "taken_out" | "put_out_early" | "collected" | "due_out" | "not_yet_due";
         /** BinCreate */
         BinCreate: {
             /** Name */
@@ -466,31 +497,6 @@ export interface components {
              * Format: date-time
              */
             date_put_out_at: string;
-        };
-        /** CalendarBin */
-        CalendarBin: {
-            /** Id */
-            id: number;
-            /** Name */
-            name: string;
-            /** Colour */
-            colour?: string | null;
-            /**
-             * Status
-             * @enum {string}
-             */
-            status: "missed" | "taken_out" | "put_out_early" | "collected" | "due_out" | "not_yet_due";
-            /** Put Out Date */
-            put_out_date?: string | null;
-            /** Put Out Id */
-            put_out_id?: number | null;
-        };
-        /** CalendarDate */
-        CalendarDate: {
-            /** Date */
-            date: string;
-            /** Bins */
-            bins: components["schemas"]["CalendarBin"][];
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -1007,7 +1013,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["CalendarDate"][];
+                    "application/json": components["schemas"]["BinCollection"][];
                 };
             };
             /** @description Validation Error */

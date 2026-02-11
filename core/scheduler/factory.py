@@ -4,15 +4,16 @@ from polars import DataFrame
 from sqlalchemy.orm import Session
 import polars as pl
 import datetime
-from core.database.repositories import ScheduleRepository, SettingsRepository, BinRepository, BinPutOutRepository
+
+from core.database.database import SessionLocal
+from core.database.repositories import ScheduleRepository, SettingsRepository, BinRepository, BinPutOutRepository, \
+    BinDayReplacementRepository
 from core.database.schemas import Schedule
 from core.scheduler.schemas import BinCollection, BinCollectionStatus
 from core.database import models, schemas
 
 class BinCollectionDataCache:
-    def __init__(self, db: Session):
-        self._db = db
-
+    def __init__(self):
         self.settings: schemas.Settings | None = None
         self.bins: dict[int, schemas.Bin] = {}
         self.schedules: dict[int, Schedule] = {}
@@ -32,66 +33,66 @@ class BinCollectionDataCache:
 
     def _load_bins(self) -> dict[int, schemas.Bin]:
         results = {}
+        with SessionLocal() as db:
+            bin_repo = BinRepository(db)
+            # Create a cache of bin objects in a dict, keyed by bin id.
 
-        bin_repo = BinRepository(self._db)
-        # Create a cache of bin objects in a dict, keyed by bin id.
-
-        for bin in bin_repo.get_all():
-            results[bin.id] = schemas.Bin.model_validate(bin)
+            for bin in bin_repo.get_all():
+                results[bin.id] = schemas.Bin.model_validate(bin)
 
         return results
 
     def _load_schedules(self) -> dict[int, Schedule]:
         results = {}
 
-        schedule_repo = ScheduleRepository(self._db)
+        with SessionLocal() as db:
 
-        for schedule in schedule_repo.get_all_active():
-            results[schedule.id] = schemas.Schedule.model_validate(schedule)
+            schedule_repo = ScheduleRepository(db)
+
+            for schedule in schedule_repo.get_all_active():
+                results[schedule.id] = schemas.Schedule.model_validate(schedule)
 
         return results
 
     def _load_bin_day_put_outs(self) -> dict[int, List[schemas.BinPutOut]]:
         results: dict[int, List[schemas.BinPutOut]] = {}
+        with SessionLocal() as db:
 
-        put_out_repo = BinPutOutRepository(self._db)
+            put_out_repo = BinPutOutRepository(db)
 
-        put_outs = put_out_repo.get_all()
+            put_outs = put_out_repo.get_all()
 
-        # Group put-outs by bin_id
-        for put_out in put_outs:
-            if put_out.bin_id not in results:
-                results[put_out.bin_id] = []
-            results[put_out.bin_id].append(put_out)
+            # Group put-outs by bin_id
+            for put_out in put_outs:
+                if put_out.bin_id not in results:
+                    results[put_out.bin_id] = []
+                results[put_out.bin_id].append(put_out)
 
-        # Sort each bin's put-outs by date_put_out_at
-        for bin_id in results:
-            results[bin_id].sort(key=lambda x: x.date_put_out_at)
+            # Sort each bin's put-outs by date_put_out_at
+            for bin_id in results:
+                results[bin_id].sort(key=lambda x: x.date_put_out_at)
 
         return results
 
     def _load_bin_day_replacements(self) -> dict[datetime.date, schemas.BinDayReplacement]:
         results = {}
 
-        replacement_repo = self._db.query(models.BinDayReplacement).all()
+        with SessionLocal() as db:
+            replacement_repo = BinDayReplacementRepository(db)
 
-        for replacement in replacement_repo:
-            results[replacement.replace.date()] = schemas.BinDayReplacement.model_validate(replacement)
+            for replacement in replacement_repo.get_all():
+                results[replacement.replace.date()] = schemas.BinDayReplacement.model_validate(replacement)
 
         return results
 
 
 
 class BinCollectionFactory:
-    def __init__(self, data_source: BinCollectionDataCache | Session):
-        if isinstance(data_source, BinCollectionDataCache):
-            data = data_source
-        elif isinstance(data_source, Session):
-            data = BinCollectionDataCache(data_source)
-        else:
-            raise ValueError("Invalid data source type. Must be BinCollectionDataCache or Session.")
+    def __init__(self, data_source: BinCollectionDataCache = None):
+        if data_source is None:
+            data_source = BinCollectionDataCache()
 
-        self._data = data
+        self._data = data_source
 
     def build_collections_dataframe(self) -> DataFrame:
         # Let's prepare the data first
@@ -164,7 +165,10 @@ class BinCollectionFactory:
                 current_date += datetime.timedelta(weeks=schedule.repeat_weeks)
 
         # 2. Recreate the DataFrame
-        return pl.from_dicts([bc.model_dump() for bc in bin_collections])
+        return pl.from_dicts([
+            {**bc.model_dump(), "status": bc.status.value}
+            for bc in bin_collections
+        ])
 
     def _find_matching_put_out(
         self,

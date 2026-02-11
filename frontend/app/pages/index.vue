@@ -95,7 +95,7 @@ import type { CalendarOptions } from '@fullcalendar/core'
 import { format, parseISO, startOfMonth, endOfMonth, addMonths } from 'date-fns'
 import type { components } from '../../types/api'
 import type { EventDropData } from '../components/EventDropModal.vue'
-import type { CalendarBin } from '../composables/useSchedulesQuery'
+import type { BinCollection } from '../composables/useSchedulesQuery'
 
 type Schedule = components['schemas']['Schedule']
 type BinDayReplacement = components['schemas']['BinDayReplacement']
@@ -122,44 +122,42 @@ const { calendarQuery } = useCalendarQuery(calendarStart, calendarEnd)
 const { findScheduleForEvent, createEventDropData } = useCalendarEventHandling()
 
 const calendarEvents = computed(() => {
-  const dates = calendarQuery.data.value || []
+  const collections = calendarQuery.data.value || []
   const events: any[] = []
 
-  dates.forEach((dateEntry) => {
-    dateEntry.bins.forEach((bin) => {
-      // Determine icon based on status
-      let icon = ''
-      switch (bin.status) {
-        case 'taken_out':
-          icon = '✓ ' // Check mark
-          break
-        case 'put_out_early':
-          icon = '⚡ ' // Lightning bolt (indicates early action)
-          break
-        case 'collected':
-          icon = '✅ ' // Check mark with box (completed)
-          break
-        case 'missed':
-          icon = '✗ ' // X mark
-          break
-        case 'due_out':
-          icon = '! ' // Exclamation mark
-          break
-        case 'not_yet_due':
-          icon = '' // No icon
-          break
-      }
+  collections.forEach((collection) => {
+    // Determine icon based on status
+    let icon = ''
+    switch (collection.status) {
+      case 'taken_out':
+        icon = '✓ ' // Check mark
+        break
+      case 'put_out_early':
+        icon = '⚡ ' // Lightning bolt (indicates early action)
+        break
+      case 'collected':
+        icon = '✅ ' // Check mark with box (completed)
+        break
+      case 'missed':
+        icon = '✗ ' // X mark
+        break
+      case 'due_out':
+        icon = '! ' // Exclamation mark
+        break
+      case 'not_yet_due':
+        icon = '' // No icon
+        break
+    }
 
-      events.push({
-        title: icon + bin.name,
-        date: dateEntry.date,
-        backgroundColor: bin.colour || '#888',
-        borderColor: bin.colour || '#888',
-        extendedProps: {
-          binId: bin.id,
-          status: bin.status,
-        },
-      })
+    events.push({
+      title: icon + collection.bin_name,
+      date: format(parseISO(collection.collection_due_at), 'yyyy-MM-dd'),
+      backgroundColor: collection.bin_colour || '#888',
+      borderColor: collection.bin_colour || '#888',
+      extendedProps: {
+        binId: collection.bin_id,
+        status: collection.status,
+      },
     })
   })
 
@@ -199,7 +197,7 @@ function handleBinDrop(dropInfo: any) {
 
 // Bin status modal
 const isBinStatusModalOpen = ref(false)
-const selectedBin = ref<CalendarBin | null>(null)
+const selectedBin = ref<BinCollection | null>(null)
 const selectedDate = ref<string | null>(null)
 const selectedSchedule = ref<Schedule | null>(null)
 const selectedReplacement = ref<BinDayReplacement | null>(null)
@@ -208,8 +206,10 @@ const selectedReplacement = ref<BinDayReplacement | null>(null)
 watch(() => calendarQuery.data.value, (newCalendarData) => {
   // Only update if modal is open and we have a selected bin
   if (isBinStatusModalOpen.value && selectedBin.value && selectedDate.value && newCalendarData) {
-    const dateEntry = newCalendarData.find(d => d.date === selectedDate.value)
-    const updatedBin = dateEntry?.bins.find(b => b.id === selectedBin.value?.id)
+    const updatedBin = newCalendarData.find(c =>
+      c.bin_id === selectedBin.value?.bin_id &&
+      format(parseISO(c.collection_due_at), 'yyyy-MM-dd') === selectedDate.value
+    )
 
     if (updatedBin) {
       selectedBin.value = updatedBin
@@ -221,11 +221,13 @@ function handleEventClick(clickInfo: any) {
   const binId = clickInfo.event.extendedProps.binId
   const eventDate = format(clickInfo.event.start, 'yyyy-MM-dd')
 
-  // Find the bin data from calendar query
-  const dateEntry = calendarQuery.data.value?.find(d => d.date === eventDate)
-  const binData = dateEntry?.bins.find(b => b.id === binId)
+  // Find the bin collection from calendar query
+  const binCollection = calendarQuery.data.value?.find(c =>
+    c.bin_id === binId &&
+    format(parseISO(c.collection_due_at), 'yyyy-MM-dd') === eventDate
+  )
 
-  if (!binData) return
+  if (!binCollection) return
 
   // Check if there's a replacement that moves TO this date
   const replacement = replacements.value.find(
@@ -236,7 +238,7 @@ function handleEventClick(clickInfo: any) {
   const schedule = findScheduleForEvent(binId, eventDate)
 
   // Set modal data
-  selectedBin.value = binData
+  selectedBin.value = binCollection
   selectedDate.value = eventDate
   selectedSchedule.value = schedule
   selectedReplacement.value = replacement || null

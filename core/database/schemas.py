@@ -136,15 +136,3 @@ class SettingsEdit(BaseModel):
     #         raise ValueError("App name must start with a capital letter")
     #     return v
 
-# Calendar endpoint schemas
-class CalendarBin(BaseModel):
-    id: int
-    name: str
-    colour: Optional[str] = None
-    status: Literal['missed', 'taken_out', 'put_out_early', 'collected', 'due_out', 'not_yet_due']
-    put_out_date: Optional[str] = None  # ISO date format YYYY-MM-DD, only present if taken_out, put_out_early, or collected
-    put_out_id: Optional[int] = None  # ID of the put-out record, only present if taken_out, put_out_early, or collected
-
-class CalendarDate(BaseModel):
-    date: str  # ISO date format YYYY-MM-DD
-    bins: list[CalendarBin]

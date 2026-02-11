@@ -9,7 +9,6 @@ load_dotenv(dotenv_path=root_dir / ".env")
 
 sys.path.append(str(root_dir))
 
-from core.database.database import get_db
 from core.scheduler.factory import BinCollectionFactory
 
 # Load environment variables from .env file
@@ -21,14 +20,14 @@ sys.path.append(str(root_dir))
 from core.scheduler.scheduler import BinCollectionExplorer
 
 def run():
-    db = next(get_db())
-    factory = BinCollectionFactory(db)
+    factory = BinCollectionFactory()
 
     dataframe = factory.build_collections_dataframe()
 
     print(dataframe)
 
-    db.close()
+    print(BinCollectionExplorer().get_next_collections_for_all_bins())
+
 
 if __name__ == "__main__":
     run()

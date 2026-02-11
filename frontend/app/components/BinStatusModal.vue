@@ -6,10 +6,10 @@
         <div class="flex items-center gap-3">
           <div
             class="w-8 h-8 rounded-full"
-            :style="{ backgroundColor: bin.colour || '#888' }"
+            :style="{ backgroundColor: bin.bin_colour || '#888' }"
           ></div>
           <div>
-            <h3 class="font-semibold text-lg">{{ bin.name }}</h3>
+            <h3 class="font-semibold text-lg">{{ bin.bin_name }}</h3>
             <p class="text-sm text-gray-500">{{ formatDate(collectionDate, 'EEEE, MMMM d, yyyy') }}</p>
           </div>
         </div>
@@ -21,8 +21,8 @@
               <span class="text-2xl">{{ statusIcon }}</span>
               <div>
                 <p class="font-medium">{{ statusText }}</p>
-                <p v-if="bin.put_out_date" class="text-sm text-gray-500">
-                  Put out on {{ formatDate(bin.put_out_date, 'MMM d, yyyy') }}
+                <p v-if="bin.taken_out_at" class="text-sm text-gray-500">
+                  Put out on {{ formatDate(parseISO(bin.taken_out_at), 'MMM d, yyyy') }}
                 </p>
               </div>
             </div>
@@ -136,8 +136,8 @@
 </template>
 
 <script setup lang="ts">
-import { format as formatDate } from 'date-fns'
-import type { CalendarBin, CalendarDate } from '../composables/useSchedulesQuery'
+import { format as formatDate, parseISO } from 'date-fns'
+import type { BinCollection } from '../composables/useSchedulesQuery'
 import type { components } from '../../types/api'
 
 type Schedule = components['schemas']['Schedule']
@@ -145,11 +145,11 @@ type BinDayReplacement = components['schemas']['BinDayReplacement']
 
 interface Props {
   open: boolean
-  bin?: CalendarBin | null
+  bin?: BinCollection | null
   collectionDate?: string | null
   schedule?: Schedule | null
   replacement?: BinDayReplacement | null
-  calendarData?: CalendarDate[] | null
+  calendarData?: BinCollection[] | null
 }
 
 const props = defineProps<Props>()
@@ -179,19 +179,21 @@ const hasEarlierUncollectedBin = computed(() => {
   const currentDate = props.collectionDate
 
   // Find all earlier calendar entries for the same bin
-  for (const dateEntry of props.calendarData) {
-    // Skip if this is the current date or later
-    if (dateEntry.date >= currentDate) continue
+  for (const collection of props.calendarData) {
+    // Only check collections for the same bin
+    if (collection.bin_id !== props.bin.bin_id) continue
 
-    // Check if this date has the same bin
-    const sameBin = dateEntry.bins.find(b => b.id === props.bin?.id)
-    if (!sameBin) continue
+    // Get the collection date
+    const collectionDate = formatDate(parseISO(collection.collection_due_at), 'yyyy-MM-dd')
+
+    // Skip if this is the current date or later
+    if (collectionDate >= currentDate) continue
 
     // Check if the bin hasn't been collected yet
     // 'collected' and 'missed' statuses mean the collection event has passed
     // These statuses indicate the bin collection is still pending:
-    if (sameBin.status === 'not_yet_due' || sameBin.status === 'due_out' ||
-        sameBin.status === 'taken_out' || sameBin.status === 'put_out_early') {
+    if (collection.status === 'not_yet_due' || collection.status === 'due_out' ||
+        collection.status === 'taken_out' || collection.status === 'put_out_early') {
       return true
     }
   }
@@ -241,7 +243,7 @@ function markAsPutOut() {
 
   // Create a put out record with the current datetime
   createBinPutOut.mutate({
-    bin_id: props.bin.id,
+    bin_id: props.bin.bin_id,
     date_put_out_at: new Date().toISOString(),
   }, {
     onSuccess: () => {

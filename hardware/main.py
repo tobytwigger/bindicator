@@ -163,7 +163,8 @@ class AppRunner:
                 while True:
                     tick_count += 1
                     if tick_count % 100 == 0:  # Log every 100 ticks to avoid spam
-                        logger.debug(f"{screen_name}: Tick #{tick_count}")
+                        pass
+                        # logger.debug(f"{screen_name}: Tick #{tick_count}")
 
                     result = screen.tick(self._drivers)
 

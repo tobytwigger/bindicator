@@ -1,14 +1,14 @@
-from typing import List
-from contextlib import contextmanager
+from typing import List, Tuple
 import threading
+
 from core.database.database import SessionLocal
 from core.database.repositories import BinRepository
 from hardware.drivers.drivers import Drivers
 from hardware.drivers.lights import LightState
-from hardware.screens.abstract_screen import Screen, QuitApp
 from schedule import Scheduler, CancelJob
 from hardware.drivers.inputs import InputEvents
 import datetime
+from core.scheduler.schemas import BinCollection
 from core.scheduler.scheduler import BinCollectionExplorer
 from core.database import models
 from hardware.utils.date_format import format_date
@@ -24,29 +24,9 @@ class SingleBinCollection(Screen):
         logger.info(f"SingleBinCollection screen created for bin_id={bin_id}")
         self._bin_id = bin_id
         self._bin_collection_explorer = BinCollectionExplorer()
-        self._current_date = self._bin_collection_explorer.get_collection_date_after(
-            datetime.date.today(), self._bin_id
-        )
-        logger.debug(f"Initial date for bin {bin_id} set to: {self._current_date}")
+        self._selected_index = 0
         self._cache_lock = threading.Lock()  # Thread-safe access to cache
         self._mqtt_subscribed = False  # Track subscription state
-
-    @classmethod
-    def from_input_events(cls, events: List[InputEvents]):
-        db = SessionLocal()
-
-        bin_repo = BinRepository(db)
-        bin = bin_repo.get_by_button_press(events)
-
-        db.close()
-
-        if bin is not None:
-            logger.info(f"Found bin '{bin.name}' (id={bin.id})")
-            return cls(bin.id)
-        else:
-            logger.warning(f"No bin found for button presses: {[e.name for e in events]}")
-
-        return None
 
     def on_enter(self, schedule: Scheduler, drivers: Drivers):
         logger.info(f"Entering SingleBinCollection screen for bin_id={self._bin_id}")
@@ -60,7 +40,8 @@ class SingleBinCollection(Screen):
             except Exception as e:
                 logger.warning(f"Failed to subscribe to MQTT: {e}")
 
-        self._display_correct_outputs(drivers)
+        schedule.every(15).minutes.do(self._bin_collection_explorer.load_data)
+        self._update_outputs(drivers)
 
     def on_exit(self, drivers: Drivers):
         """Clean up MQTT subscription when leaving the screen."""
@@ -77,18 +58,12 @@ class SingleBinCollection(Screen):
         logger.info("Database update notification received")
         with self._cache_lock:
             try:
-                self._bin_collection_explorer.clear_cache()
-                # Check the current date is still valid. If it isn't, go to first collection date
-                is_current_date_still_collection_date = len(
-                    [b for b in self._bin_collection_explorer.get_bins_due_out_on(self._current_date) if b.id == self._bin_id]
-                ) > 0
-                if not is_current_date_still_collection_date:
-                    logger.info(f"Current date {self._current_date} no longer valid, finding next collection date")
-                    self._current_date = self._bin_collection_explorer.get_collection_date_after(
-                        datetime.date.today(), self._bin_id
-                    )
+                self._bin_collection_explorer.load_data()
+                if self._selected_index >= len(self._bin_collection_explorer.data):
+                    logger.info(f"Selected index {self._selected_index} out of range after refresh, resetting to 0")
+                    self._selected_index = 0
 
-                self._display_correct_outputs(drivers)
+                self._update_outputs(drivers)
                 logger.debug("Cache refreshed after database update")
             except Exception as e:
                 logger.error(f"Error refreshing cache: {e}", exc_info=True)
@@ -102,68 +77,66 @@ class SingleBinCollection(Screen):
             return Settings()
 
         if InputEvents.LEFT_BUTTON_PRESSED in events:
-            logger.debug(f"Left button pressed, navigating to previous date from {self._current_date}")
-            previous_date = self._bin_collection_explorer.get_collection_date_before(self._current_date,
-                                                                                     bin_id=self._bin_id)
-            if previous_date is not None and previous_date >= datetime.date.today():
-                self._current_date = previous_date
-                logger.info(f"Navigated to previous date: {self._current_date}")
-                self._display_correct_outputs(drivers)
-                return None
+            logger.debug(f"Left button pressed, navigating to previous date from index {self._selected_index}")
+            if self._selected_index > 0:
+                self._selected_index -= 1
+                self._update_outputs(drivers)
+
+            return None
 
         if InputEvents.RIGHT_BUTTON_PRESSED in events:
-            logger.debug(f"Right button pressed, navigating to next date from {self._current_date}")
-            bin_is_due_today = len(self._bin_collection_explorer.get_bins_due_out_on(self._current_date)) > 0
-            bin_is_due_tomorrow = len(self._bin_collection_explorer.get_bins_due_out_on(self._current_date + datetime.timedelta(days=1))) > 0
-
-            next_date = None
-            if bin_is_due_today:
-                next_date = self._bin_collection_explorer.get_collection_date_after(self._current_date, bin_id=self._bin_id)
-            elif bin_is_due_tomorrow:
-                next_date = self._bin_collection_explorer.get_collection_date_after(self._current_date + datetime.timedelta(days=1), bin_id=self._bin_id)
-
-            if next_date is not None and next_date >= datetime.date.today():
-                self._current_date = next_date
-                logger.info(f"Navigated to next date: {self._current_date}")
-                self._display_correct_outputs(drivers)
-                return None
+            logger.debug(f"Right button pressed, navigating to next collection date from index {self._selected_index}")
+            if self._selected_index < len(self._bin_collection_explorer.data) - 1:
+                self._selected_index += 1
+                self._update_outputs(drivers)
+            return None
 
         if InputEvents.BIN_1_PRESSED in events or InputEvents.BIN_2_PRESSED in events or InputEvents.BIN_3_PRESSED in events or InputEvents.BIN_4_PRESSED in events:
             logger.debug(f"Bin button pressed: {[e.name for e in events]}")
-            new_screen = SingleBinCollection.from_input_events(events)
-            if new_screen._bin_id == self._bin_id:
+
+            first_button_event = next((e for e in events if e.is_bin_press()), None)
+
+            if first_button_event is None:
+                logger.warning("No bin press events found in events: " + str(events))
+                return None
+
+            logger.debug(f"Bin button {first_button_event} pressed, filtered from {len(events)}")
+
+            bin = first_button_event.get_bin()
+
+            if bin is None:
+                logger.info("No bin found for button presses: " + str(events))
+                return None
+
+            logger.info(f"Found bin '{bin.name}' (id={bin.id}) related to the button press")
+
+
+            if bin.id == self._bin_id:
                 logger.info("Same bin pressed, returning to Today screen")
                 from hardware.screens.bins.today import Today
                 return Today()
             else:
-                logger.info(f"Different bin pressed, switching to bin_id={new_screen._bin_id}")
-                return new_screen
+                logger.info(f"Different bin pressed, switching to bin_id={bin.id}")
+                return SingleBinCollection(bin.id)
 
         return None
 
-    def _display_correct_outputs(self, drivers: Drivers):
-        bin = self._bin_collection_explorer.get_bin_by_id(self._bin_id)
+    def _update_outputs(self, drivers: Drivers):
 
-        has_next_date = self._bin_collection_explorer.get_collection_date_after(self._current_date, bin_id=self._bin_id)
-        has_previous_date = self._bin_collection_explorer.get_collection_date_before(self._current_date, bin_id=self._bin_id)
+        total_count, collection = self._bin_collection_explorer.get_not_yet_due_collection_day_for_bin_by_index(self._selected_index, self._bin_id)
 
-        drivers.lcd.display(
-            format_date(self._current_date),
-            bin.name,
-            drivers.lcd.TEXT_STYLE_CENTER,
-            prefix='<' if has_previous_date else None,
-            suffix='>' if has_next_date else None
-        )
-
-        bin_state: list[LightState] = [LightState.OFF, LightState.OFF, LightState.OFF, LightState.OFF]
-
-        bin_state[bin.position - 1] = LightState.ON
-
+        # Start easy with the bin lights. They should be on if in the collection, or off otherwise.
         drivers.lights.set_lights(
-            bin_state[0],
-            bin_state[1],
-            bin_state[2],
-            bin_state[3]
+            *[LightState.ON if collection.bin_position == pos else LightState.OFF for pos in range(1, 5)]
         )
-        return
 
+        # Next the LCD. We show a date at the top, and the bins listed below
+        # We should have a prefix < always (can go bcak to today screen), and a suffix > if the index is < the max index (so we know we can navigate in either direction)
+        drivers.lcd.display(
+            format_date(collection.collection_due_at),
+            collection.bin_name,
+            drivers.lcd.TEXT_STYLE_CENTER,
+            prefix='<' if self._selected_index > 0 else None,
+            suffix='>' if self._selected_index < total_count else None,
+        )
+        # Always show a date at the top, and bins at the bottom

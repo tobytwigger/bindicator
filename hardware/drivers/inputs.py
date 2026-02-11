@@ -1,4 +1,7 @@
 import time
+
+from core.database.database import SessionLocal
+from core.database.repositories import BinRepository
 from hardware.drivers.drivers import Drivers
 from enum import Enum
 import queue
@@ -35,6 +38,18 @@ class InputEvents(Enum):
 
     def is_bin_press(self) -> bool:
         return self in [InputEvents.BIN_1_PRESSED, InputEvents.BIN_2_PRESSED, InputEvents.BIN_3_PRESSED, InputEvents.BIN_4_PRESSED]
+
+    def get_bin(self):
+        bin = None
+
+        # Load the bin that was pressed
+        with SessionLocal() as db:
+            bin_repo = BinRepository(db)
+
+            bin = bin_repo.get_by_position(self.get_button_position())
+
+        return bin
+
 
 class Inputs:
     # Debounce interval for button presses (seconds)

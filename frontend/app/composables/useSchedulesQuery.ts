@@ -6,20 +6,7 @@ type Schedule = components['schemas']['Schedule']
 type ScheduleCreate = components['schemas']['ScheduleCreate']
 type ScheduleEdit = components['schemas']['ScheduleEdit']
 type PaginationResponse = components['schemas']['PaginationResponse_Schedule_']
-
-export interface CalendarBin {
-  id: number
-  name: string
-  colour: string
-  status: 'missed' | 'taken_out' | 'put_out_early' | 'collected' | 'due_out' | 'not_yet_due'
-  put_out_date?: string | null
-  put_out_id?: number | null
-}
-
-export interface CalendarDate {
-  date: string
-  bins: CalendarBin[]
-}
+export type BinCollection = components['schemas']['BinCollection']
 
 export function useSchedulesQuery(page = ref(1), perPage = ref(100)) {
   const { apiFetch } = useApi()
@@ -40,7 +27,7 @@ export function useCalendarQuery(start: Ref<Date>, end: Ref<Date>) {
     queryFn: () => {
       const startStr = format(start.value, 'yyyy-MM-dd')
       const endStr = format(end.value, 'yyyy-MM-dd')
-      return apiFetch<CalendarDate[]>(`/schedules/calendar?start=${startStr}&end=${endStr}`)
+      return apiFetch<BinCollection[]>(`/schedules/calendar?start=${startStr}&end=${endStr}`)
     },
     enabled: computed(() => !!start.value && !!end.value),
   })
