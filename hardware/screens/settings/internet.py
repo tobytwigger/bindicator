@@ -3,7 +3,7 @@ from typing import List
 from hardware.drivers.drivers import Drivers
 from hardware.drivers.lights import LightState
 from schedule import Scheduler, CancelJob
-from hardware.drivers.inputs import InputEvents
+from hardware.drivers.inputs import InputEvent, InputEvents
 import datetime
 
 from hardware.utils.date_format import format_date
@@ -12,6 +12,7 @@ from dataclasses import dataclass
 import threading
 import socket
 from hardware.utils.logging_config import setup_logger
+from hardware.utils.menu_manager import MenuItem, MenuManager
 
 logger = setup_logger('INTERNET SCREEN')
 
@@ -37,53 +38,53 @@ def ping_internet(host="8.8.8.8", port=53, timeout=3):
 
 class Internet(Screen):
 
-    options: List[str] = [
-        "Status",
-        "Network Name",
-        "Back",
-    ]
-
     def __init__(self):
         logger.info("Internet screen created")
-        self.selected_option: int = 0
+        self.menu = MenuManager(
+            menu_items=[
+                MenuItem(
+                    name="Status",
+                    text=lambda: "Checking..." if self.is_loading else (self.internet_status.status if self.internet_status else "Try again later")
+                ),
+                MenuItem(
+                    name="Network Name",
+                    text=lambda: "Checking..." if self.is_loading else (self.internet_status.ssid if self.internet_status and self.internet_status.ssid else "Try again later")
+                ),
+            ],
+            on_back = lambda: self._create_settings()
+        )
         self.is_loading: bool = False
         self.internet_status: InternetStatus | None = None
         self._status_thread: threading.Thread | None = None
 
+    def _create_settings(self):
+        from hardware.screens.settings.settings import Settings
+
+        return Settings()
+
     def on_enter(self, schedule: Scheduler, drivers: Drivers):
         logger.info("Entering Internet screen")
         self._start_status_check()
-        self._update_screen(drivers)
         drivers.lights.set_lights(LightState.OFF, LightState.OFF, LightState.OFF, LightState.OFF)
+        self._update_screen(drivers)
 
 
-    def handle_inputs(self, events: List[InputEvents], drivers: Drivers = None):
-        if InputEvents.LEFT_BUTTON_PRESSED in events:
-            if self.selected_option > 0:
-                self.selected_option -= 1
-            else:
-                self.selected_option = len(self.options) - 1
+    def handle_inputs(self, events: InputEvents, drivers: Drivers = None):
+        was_updated, screen_to_update = self.menu.handle_inputs(events)
 
-            logger.debug(f"Left button pressed, selected option: {self.options[self.selected_option]}")
+        if screen_to_update is not None:
+            return screen_to_update
+
+        if was_updated:
+            logger.debug(f"Menu selection updated to {self.menu.selected_menu_item.name}")
             self._update_screen(drivers)
-
-        if InputEvents.RIGHT_BUTTON_PRESSED in events:
-            if self.selected_option < len(self.options) - 1:
-                self.selected_option += 1
-            else:
-                self.selected_option = 0
-
-            logger.debug(f"Right button pressed, selected option: {self.options[self.selected_option]}")
-            self._update_screen(drivers)
-
-        if InputEvents.LEFT_BUTTON_PRESSED in events and InputEvents.RIGHT_BUTTON_PRESSED in events:
-            logger.info(f"Both buttons pressed, activating option: {self.options[self.selected_option]}")
-            return self._activate_option()
 
         return None
 
     def tick(self, drivers) -> Screen | None | QuitApp:
         self._update_screen(drivers)
+
+        return None
 
     def _start_status_check(self):
         logger.info("Starting internet status check in background thread")
@@ -135,30 +136,7 @@ class Internet(Screen):
         self._status_thread.start()
 
     def _update_screen(self, drivers: Drivers):
-        drivers.lcd.display(self.options[self.selected_option] or "Unknown Option", self._get_active_option_text() or "", drivers.lcd.TEXT_STYLE_CENTER, prefix="<", suffix=">")
-
-    def _get_active_option_text(self) -> str | None:
-         if self.options[self.selected_option] == "Status":
-             if self.is_loading:
-                 return "Checking..."
-             elif self.internet_status is not None:
-                 return self.internet_status.status
-             else:
-                 return "Try again later"
-         elif self.options[self.selected_option] == "Network Name":
-             if self.is_loading:
-                 return "Checking..."
-             elif self.internet_status is not None:
-                 return self.internet_status.ssid
-             else:
-                 return "Try again later"
-
-         return None
-
-    def _activate_option(self) -> Screen | None | QuitApp:
-        if self.options[self.selected_option] == "Back":
-            logger.info("Navigating back to Settings screen")
-            from hardware.screens.settings.settings import Settings
-
-            return Settings()
+        drivers.lcd.display(
+            self.menu.selected_menu_item.name,
+            self.menu.selected_menu_item.text, drivers.lcd.TEXT_STYLE_CENTER, prefix="<", suffix=">")
 

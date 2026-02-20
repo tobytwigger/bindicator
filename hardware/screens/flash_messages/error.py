@@ -6,12 +6,16 @@ from hardware.utils.logging_config import setup_logger
 logger = setup_logger('ERROR SCREEN')
 
 class ErrorScreen(Screen):
-    def __init__(self):
+    def __init__(self, error: Exception):
+        self._error = error
         logger.error("ErrorScreen created - fatal error occurred")
         self._finish_saying_bye = False
 
     def on_enter(self, schedule: Scheduler, drivers: Drivers):
         logger.error("Entering ErrorScreen - displaying error message")
+        logger.error(f"Fatal error occurred: {self._error}", exc_info=self._error)
+        logger.error(f"Stack trace: {self._error.__traceback__}")
+
         drivers.lcd.display('Error!', 'System rebooting', drivers.lcd.TEXT_STYLE_CENTER)
         schedule.every(3).seconds.do(self._finish_closing_app)
 

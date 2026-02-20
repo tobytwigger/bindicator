@@ -122,6 +122,10 @@ class BinRepository:
             return None
         return schemas.Bin.model_validate(db_bin)
 
+    def count(self) -> int:
+        return self.db.query(func.count(models.Bin.id)).scalar()
+
+
 class ScheduleRepository:
     def __init__(self, db: Session):
         self.db = db

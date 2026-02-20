@@ -1,6 +1,8 @@
 #!/home/toby/bindicator/.venv/bin/python
 import sys
 from pathlib import Path
+from typing import Callable
+
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
@@ -23,7 +25,7 @@ import time
 import schedule
 import threading
 from hardware.drivers.drivers import Drivers
-from hardware.drivers.inputs import Inputs, InputEvents
+from hardware.drivers.inputs import Inputs, InputEvent
 from hardware.screens.abstract_screen import Screen, QuitApp
 from hardware.utils.logging_config import setup_logger
 
@@ -75,14 +77,9 @@ def run():
     logger.info("Creating AppRunner instance")
     runner = AppRunner(drivers, inputs)
     runner.set_quitting_screen(GoodbyeScreen())
-
-    try:
-        logger.info("Starting main application loop")
-        runner.run(screen)
-    except Exception as e:
-        logger.error(f"Fatal exception occurred in main loop: {e}", exc_info=True)
-        runner.set_quitting_screen(ErrorScreen())
-        runner.handle_exception(e)
+    runner.show_screen_on_error(lambda e: ErrorScreen(e))
+    logger.info("Starting main application loop")
+    runner.run(screen)
 
 def set_up_gpio():
     logger.info("Configuring GPIO mode to BCM")
@@ -93,6 +90,7 @@ def set_up_gpio():
 
 class AppRunner:
     def __init__(self, drivers: Drivers, inputs: Inputs):
+        self._error_screen_callback = None
         logger.info("Initializing AppRunner")
         self._quitting_screen = None
         self._drivers = drivers
@@ -131,91 +129,53 @@ class AppRunner:
         return cease_continuous_run
 
     def run(self, screen: Screen | None):
-        logger.info("AppRunner.run() started")
-        # Create a scheduler
-        logger.info("Creating scheduler")
-        self._schedule = schedule.Scheduler()
+        try:
+            logger.info("AppRunner.run() started")
+            # Create a scheduler
+            logger.info("Creating scheduler")
+            self._schedule = schedule.Scheduler()
 
-        # Add a regular job to check configuration
-        logger.info("Scheduling configuration checks every 1 minute")
-        self._schedule.every(1).minute.do(self._check_configuration)
-        self._schedule.every(1).minute.do(self._check_settings)
+            # Add a regular job to check configuration
+            logger.info("Scheduling configuration checks every 1 minute")
+            self._schedule.every(1).minute.do(self._check_configuration)
+            self._schedule.every(1).minute.do(self._check_settings)
 
-        # Start the input polling thread
-        logger.info("Starting input polling thread")
-        self._inputs.start()
+            # Start the input polling thread
+            logger.info("Starting input polling thread")
+            self._inputs.start()
 
-        while screen is not None:
-            screen_name = type(screen).__name__
-            logger.info(f"Entering screen {screen_name}")
+            while screen is not None:
+                screen_name = type(screen).__name__
+                logger.info(f"Entering screen {screen_name}")
 
-            # Fire the on_enter event, so screens can set up schedules and show initial states
-            logger.debug(f"Calling on_enter for {screen_name}")
-            screen.on_enter(self._schedule, self._drivers)
+                # Fire the on_enter event, so screens can set up schedules and show initial states
+                logger.debug(f"Calling on_enter for {screen_name}")
+                screen.on_enter(self._schedule, self._drivers)
 
-            # Start the scheduler running in the background
-            logger.debug(f"Starting background scheduler for {screen_name}")
-            self._stop_schedule = self._run_schedule_in_background()
+                # Start the scheduler running in the background
+                logger.debug(f"Starting background scheduler for {screen_name}")
+                self._stop_schedule = self._run_schedule_in_background()
 
-            # Start the screen running properly
-            try:
-                tick_count = 0
-                while True:
-                    tick_count += 1
-                    if tick_count % 100 == 0:  # Log every 100 ticks to avoid spam
-                        pass
-                        # logger.debug(f"{screen_name}: Tick #{tick_count}")
+                # Start the screen running properly
+                try:
+                    tick_count = 0
+                    while True:
+                        tick_count += 1
+                        if tick_count % 100 == 0:  # Log every 100 ticks to avoid spam
+                            pass
+                            # logger.debug(f"{screen_name}: Tick #{tick_count}")
 
-                    result = screen.tick(self._drivers)
-
-                    # Check if the app should quit
-                    if should_kill:
-                        logger.info("SIGTERM received, quitting application")
-                        screen.on_exit(self._drivers)
-                        screen = None
-                        break
-
-                    if isinstance(result, QuitApp):
-                        logger.info("QuitApp received from screen, quitting application")
-                        screen.on_exit(self._drivers)
-                        screen = None
-                        break
-
-                    # Check if a redirect is needed
-                    if isinstance(result, Screen):
-                        new_screen_name = type(result).__name__
-                        logger.info(f"Screen transition: {screen_name} -> {new_screen_name}")
-                        screen.on_exit(self._drivers)
-                        self._cleanup()
-                        screen = result
-                        break  # Break inner loop to transition to next_screen
-
-                    # Listen for any inputs
-                    events = self._inputs.listen()
-
-                    # Handle driver sleep/wake events
-                    if InputEvents.MOVEMENT_STOPPED in events:
-                        logger.debug("Movement stopped, putting drivers to sleep")
-                        self._drivers.sleep()
-                    elif InputEvents.MOVEMENT_DETECTED in events:
-                        logger.debug("Movement detected, waking drivers")
-                        self._drivers.wake()
-
-                    # Pass the events to the screen
-                    if len(events) > 0:
-                        event_names = [e.name for e in events]
-                        logger.debug(f"{screen_name}: Handling input events: {event_names}")
-                        result = screen.handle_inputs(events, self._drivers)
+                        result = screen.tick(self._drivers)
 
                         # Check if the app should quit
                         if should_kill:
-                            logger.info("SIGTERM received after input handling, quitting application")
+                            logger.info("SIGTERM received, quitting application")
                             screen.on_exit(self._drivers)
                             screen = None
                             break
 
                         if isinstance(result, QuitApp):
-                            logger.info("QuitApp received from input handler, quitting application")
+                            logger.info("QuitApp received from screen, quitting application")
                             screen.on_exit(self._drivers)
                             screen = None
                             break
@@ -223,35 +183,79 @@ class AppRunner:
                         # Check if a redirect is needed
                         if isinstance(result, Screen):
                             new_screen_name = type(result).__name__
-                            logger.info(f"Screen transition from input: {screen_name} -> {new_screen_name}")
+                            logger.info(f"Screen transition: {screen_name} -> {new_screen_name}")
                             screen.on_exit(self._drivers)
                             self._cleanup()
                             screen = result
                             break  # Break inner loop to transition to next_screen
 
-                    # Redirect to the config page if config is not valid
-                    # if self._redirect_to_config and screen is not None and not isinstance(screen, CheckConfiguration):
-                    #     self._redirect_to_config = False
-                    #     self._cleanup()
-                    #     screen = CheckConfiguration()
-                    #     break
+                        # Listen for any inputs
+                        events = self._inputs.listen()
 
-                    time.sleep(0.08)
+                        # Handle driver sleep/wake events
+                        if InputEvent.MOVEMENT_STOPPED in events:
+                            logger.debug("Movement stopped, putting drivers to sleep")
+                            self._drivers.sleep()
+                        elif InputEvent.MOVEMENT_DETECTED in events:
+                            logger.debug("Movement detected, waking drivers")
+                            self._drivers.wake()
 
-            except KeyboardInterrupt:
-                logger.info("KeyboardInterrupt received")
-                if screen is not None:
-                    screen.on_exit(self._drivers)
+                        # Pass the events to the screen
+                        if len(events) > 0:
+                            event_names = [e.name for e in events]
+                            logger.debug(f"{screen_name}: Handling input events: {event_names}")
+                            result = screen.handle_inputs(events, self._drivers)
 
-                # Do nothing
-                screen = None
+                            # Check if the app should quit
+                            if should_kill:
+                                logger.info("SIGTERM received after input handling, quitting application")
+                                screen.on_exit(self._drivers)
+                                screen = None
+                                break
 
-            # To get to this point, either `run` has been called with no screen, or the screen has asked for the app to quit
+                            if isinstance(result, QuitApp):
+                                logger.info("QuitApp received from input handler, quitting application")
+                                screen.on_exit(self._drivers)
+                                screen = None
+                                break
+
+                            # Check if a redirect is needed
+                            if isinstance(result, Screen):
+                                new_screen_name = type(result).__name__
+                                logger.info(f"Screen transition from input: {screen_name} -> {new_screen_name}")
+                                screen.on_exit(self._drivers)
+                                self._cleanup()
+                                screen = result
+                                break  # Break inner loop to transition to next_screen
+
+                        # Redirect to the config page if config is not valid
+                        # if self._redirect_to_config and screen is not None and not isinstance(screen, CheckConfiguration):
+                        #     self._redirect_to_config = False
+                        #     self._cleanup()
+                        #     screen = CheckConfiguration()
+                        #     break
+
+                        time.sleep(0.08)
+
+                except KeyboardInterrupt:
+                    logger.info("KeyboardInterrupt received")
+                    if screen is not None:
+                        screen.on_exit(self._drivers)
+
+                    # Do nothing
+                    screen = None
+
+                # To get to this point, either `run` has been called with no screen, or the screen has asked for the app to quit
+                self._cleanup()
+
+            logger.info("AppRunner.run() exiting, calling _quit()")
+            self._quit()
+        except Exception as e:
+            logger.error(f"Handling fatal exception: {e}", exc_info=True)
             self._cleanup()
-
-        logger.info("AppRunner.run() exiting, calling _quit()")
-        self._quit()
-
+            if self._error_screen_callback:
+                self._quitting_screen = self._error_screen_callback(e)
+            self._quit()
 
 
 
@@ -291,13 +295,11 @@ class AppRunner:
         GPIO.cleanup()
         logger.info("========== APPLICATION SHUTDOWN COMPLETE ==========")
 
-    def handle_exception(self, e):
-        logger.error(f"Handling fatal exception: {e}", exc_info=True)
-        self._quit()
-
     def set_quitting_screen(self, quitting_screen: Screen):
         self._quitting_screen = quitting_screen
 
+    def show_screen_on_error(self, callback: Callable[[Exception], Screen]):
+        self._error_screen_callback = callback
 
 
 if __name__ == "__main__":

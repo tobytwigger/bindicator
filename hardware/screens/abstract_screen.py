@@ -4,7 +4,7 @@ from typing import List
 
 from schedule import Scheduler
 from hardware.drivers.drivers import Drivers
-from hardware.drivers.inputs import InputEvents
+from hardware.drivers.inputs import InputEvent, InputEvents
 
 
 class Screen(ABC):
@@ -17,8 +17,11 @@ class Screen(ABC):
     def tick(self, drivers) -> Screen | None | QuitApp:
         pass
 
-    def handle_inputs(self, events: List[InputEvents], drivers: Drivers):
+    def handle_inputs(self, events: InputEvents, drivers: Drivers):
         pass
 
 class QuitApp:
+    pass
+
+class HandlesDataCache:
     pass

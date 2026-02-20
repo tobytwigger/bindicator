@@ -7,7 +7,7 @@ import threading
 from hardware.drivers.drivers import Drivers
 from hardware.drivers.lights import LightState
 from schedule import Scheduler, CancelJob
-from hardware.drivers.inputs import InputEvents
+from hardware.drivers.inputs import InputEvent, InputEvents
 from hardware.screens.abstract_screen import Screen
 from hardware.utils.logging_config import setup_logger
 
@@ -163,10 +163,10 @@ class RemoteControl(Screen):
         }
         return state_map.get(state_str.lower(), LightState.OFF)
 
-    def handle_inputs(self, events: List[InputEvents], drivers: Drivers = None):
+    def handle_inputs(self, events: InputEvents, drivers: Drivers = None):
         """Allow physical buttons to exit remote control mode."""
         # Press both buttons to exit remote control
-        if InputEvents.LEFT_BUTTON_PRESSED in events and InputEvents.RIGHT_BUTTON_PRESSED in events:
+        if InputEvent.LEFT_BUTTON_PRESSED in events and InputEvent.RIGHT_BUTTON_PRESSED in events:
             logger.info("Manual exit via physical buttons")
             self._cleanup()
             from hardware.screens.settings.settings import Settings

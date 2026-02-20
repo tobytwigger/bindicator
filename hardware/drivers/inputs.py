@@ -6,14 +6,12 @@ from hardware.drivers.drivers import Drivers
 from enum import Enum
 import queue
 import threading
-from typing import Optional
+from typing import Optional, List
 from hardware.utils.logging_config import setup_logger
 
 logger = setup_logger('INPUT HANDLER')
 
-# class syntax
-
-class InputEvents(Enum):
+class InputEvent(Enum):
     LEFT_BUTTON_PRESSED = 1
     RIGHT_BUTTON_PRESSED = 2
     MOVEMENT_DETECTED = 3
@@ -25,19 +23,19 @@ class InputEvents(Enum):
 
     def get_button_position(self) -> int | None:
 
-        if self == InputEvents.BIN_1_PRESSED:
+        if self == InputEvent.BIN_1_PRESSED:
             return 1
-        elif self == InputEvents.BIN_2_PRESSED:
+        elif self == InputEvent.BIN_2_PRESSED:
             return 2
-        elif self == InputEvents.BIN_3_PRESSED:
+        elif self == InputEvent.BIN_3_PRESSED:
             return 3
-        elif self == InputEvents.BIN_4_PRESSED:
+        elif self == InputEvent.BIN_4_PRESSED:
             return 4
 
         return None
 
     def is_bin_press(self) -> bool:
-        return self in [InputEvents.BIN_1_PRESSED, InputEvents.BIN_2_PRESSED, InputEvents.BIN_3_PRESSED, InputEvents.BIN_4_PRESSED]
+        return self in [InputEvent.BIN_1_PRESSED, InputEvent.BIN_2_PRESSED, InputEvent.BIN_3_PRESSED, InputEvent.BIN_4_PRESSED]
 
     def get_bin(self):
         bin = None
@@ -49,6 +47,37 @@ class InputEvents(Enum):
             bin = bin_repo.get_by_position(self.get_button_position())
 
         return bin
+
+class InputEvents:
+    def __init__(self, events: List[InputEvent]):
+        self.events = events
+
+    def __contains__(self, item):
+        return item in self.events
+
+    def contains(self, event: InputEvent):
+        return event in self.events
+
+    def __iter__(self):
+        return iter(self.events)
+
+    def __len__(self):
+        return len(self.events)
+
+    def contains_bin_press(self):
+        return (InputEvent.BIN_1_PRESSED in self.events
+                or InputEvent.BIN_2_PRESSED in self.events
+                or InputEvent.BIN_3_PRESSED in self.events
+                or InputEvent.BIN_4_PRESSED in self.events)
+
+    def get_first_bin_press(self) -> InputEvent:
+        first_button_event = next((e for e in self.events if e.is_bin_press()), None)
+
+        if first_button_event is None:
+            logger.warning("No bin press events found in events: " + str(self.events))
+            raise ValueError("No bin press events found in events")
+
+        return first_button_event
 
 
 class Inputs:
@@ -161,7 +190,7 @@ class Inputs:
 
         logger.info("Input polling thread stopped")
 
-    def listen(self):
+    def listen(self) -> InputEvents:
         """
         Retrieve all available events from the queue.
         This is called by the main application loop.
@@ -188,17 +217,17 @@ class Inputs:
                 if time_elapsed > timeout:
                     logger.info(f"Movement timeout reached ({time_elapsed:.1f}s > {timeout}s)")
                     logger.debug("Movement stopped, enqueueing MOVEMENT_STOPPED")
-                    events.append(InputEvents.MOVEMENT_STOPPED)
+                    events.append(InputEvent.MOVEMENT_STOPPED)
                     self._movement_detected_at = None
 
                     # Publish GPIO event to MQTT so external tools can see it
                     if self._mqtt_client:
-                        self._mqtt_client.publish_event(InputEvents.MOVEMENT_STOPPED)
+                        self._mqtt_client.publish_event(InputEvent.MOVEMENT_STOPPED)
 
         if events:
             logger.debug(f"Returning {len(events)} event(s): {[e.name for e in events]}")
 
-        return events
+        return InputEvents(events)
 
     def _poll_inputs_loop(self):
         """Background thread that continuously polls GPIO inputs."""
@@ -220,34 +249,34 @@ class Inputs:
                     # First detection
                     logger.info(f"Movement detected at {current_time}")
                     logger.debug("First movement detection, enqueueing MOVEMENT_DETECTED")
-                    self._enqueue_event(InputEvents.MOVEMENT_DETECTED)
+                    self._enqueue_event(InputEvent.MOVEMENT_DETECTED)
 
                     # Publish GPIO event to MQTT so external tools can see it
                     if self._mqtt_client:
-                        self._mqtt_client.publish_event(InputEvents.MOVEMENT_DETECTED)
+                        self._mqtt_client.publish_event(InputEvent.MOVEMENT_DETECTED)
 
                 self._movement_detected_at = current_time
 
         # Check all button inputs with debouncing
         if self._drivers.buttons.is_left_pressed():
-            self._enqueue_event_with_debounce(InputEvents.LEFT_BUTTON_PRESSED, current_time)
+            self._enqueue_event_with_debounce(InputEvent.LEFT_BUTTON_PRESSED, current_time)
 
         if self._drivers.buttons.is_right_pressed():
-            self._enqueue_event_with_debounce(InputEvents.RIGHT_BUTTON_PRESSED, current_time)
+            self._enqueue_event_with_debounce(InputEvent.RIGHT_BUTTON_PRESSED, current_time)
 
         if self._drivers.buttons.is_bin_1_pressed():
-            self._enqueue_event_with_debounce(InputEvents.BIN_1_PRESSED, current_time)
+            self._enqueue_event_with_debounce(InputEvent.BIN_1_PRESSED, current_time)
 
         if self._drivers.buttons.is_bin_2_pressed():
-            self._enqueue_event_with_debounce(InputEvents.BIN_2_PRESSED, current_time)
+            self._enqueue_event_with_debounce(InputEvent.BIN_2_PRESSED, current_time)
 
         if self._drivers.buttons.is_bin_3_pressed():
-            self._enqueue_event_with_debounce(InputEvents.BIN_3_PRESSED, current_time)
+            self._enqueue_event_with_debounce(InputEvent.BIN_3_PRESSED, current_time)
 
         if self._drivers.buttons.is_bin_4_pressed():
-            self._enqueue_event_with_debounce(InputEvents.BIN_4_PRESSED, current_time)
+            self._enqueue_event_with_debounce(InputEvent.BIN_4_PRESSED, current_time)
 
-    def _enqueue_event_with_debounce(self, event: InputEvents, current_time: float):
+    def _enqueue_event_with_debounce(self, event: InputEvent, current_time: float):
         """Enqueue an event only if debounce interval has passed."""
         last_time = self._last_event_time.get(event, 0)
         time_since_last = current_time - last_time
@@ -263,7 +292,7 @@ class Inputs:
         else:
             logger.debug(f"Skipping {event.name} (time since last: {time_since_last:.3f}s < {self.DEBOUNCE_INTERVAL}s)")
 
-    def _enqueue_event(self, event: InputEvents):
+    def _enqueue_event(self, event: InputEvent):
         """Add event to queue, dropping if full."""
         try:
             self._event_queue.put_nowait(event)

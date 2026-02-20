@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 from hardware.utils.logging_config import setup_logger
 
 if TYPE_CHECKING:
-    from hardware.drivers.inputs import InputEvents
+    from hardware.drivers.inputs import InputEvent
 
 logger = setup_logger('MQTT')
 
@@ -70,7 +70,7 @@ class MqttClient:
             self._connected = False
             logger.info("Disconnected from MQTT broker")
 
-    def publish_event(self, event: 'InputEvents'):
+    def publish_event(self, event: 'InputEvent'):
         """
         Publish an input event to MQTT.
         Used to broadcast GPIO button presses to external tools.

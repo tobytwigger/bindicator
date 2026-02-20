@@ -6,12 +6,13 @@ from core.database.database import SessionLocal
 from core.database.repositories import BinRepository, BinPutOutRepository
 from hardware.drivers.drivers import Drivers
 from hardware.drivers.lights import LightState
-from hardware.screens.abstract_screen import Screen
+from hardware.screens.abstract_screen import Screen, QuitApp, HandlesDataCache
 from schedule import Scheduler
-from hardware.drivers.inputs import InputEvents
+from hardware.drivers.inputs import InputEvent, InputEvents
 import datetime
 from core.scheduler.scheduler import BinCollectionExplorer
 from core.scheduler.schemas import BinCollection, BinCollectionStatus
+from hardware.utils.bin_collection_caching import BinCollectionDataCaching
 from hardware.utils.logging_config import setup_logger
 from core.database import schemas
 
@@ -26,76 +27,39 @@ class Today(Screen):
 
     def __init__(self):
         logger.info("Today screen created")
-        self._cache_lock = threading.Lock()  # Thread-safe access to cache
-        self._mqtt_subscribed = False  # Track subscription state
-        self._bin_explorer = BinCollectionExplorer()
+        self._bin_collections = BinCollectionDataCaching()
         self._actively_confirming_bin_id: int | None = None  # Track if we're actively confirming a bin action
 
     def on_enter(self, schedule: Scheduler, drivers: Drivers):
         logger.info("Entering Today screen")
-        # Subscribe to database update notifications via MQTT
-        if drivers.mqtt and not self._mqtt_subscribed:
-            try:
-                drivers.mqtt.subscribe("bindicator/database/updated",
-                                       lambda payload: self._on_database_updated(payload, drivers))
-                self._mqtt_subscribed = True
-                logger.info("Subscribed to database updates via MQTT")
-            except Exception as e:
-                logger.warning(f"Failed to subscribe to MQTT: {e}")
-
-        schedule.every(15).minutes.do(self._bin_explorer.load_data)
+        self._bin_collections.subscribe(logger, schedule, drivers)
         self._update_outputs(drivers)
 
     def on_exit(self, drivers):
         """Clean up MQTT subscription when leaving the screen."""
         logger.info("Exiting Today screen")
-        if drivers.mqtt and self._mqtt_subscribed:
-            try:
-                drivers.mqtt.unsubscribe("bindicator/database/updated")
-                self._mqtt_subscribed = False
-                logger.info("Unsubscribed from database updates")
-            except Exception as e:
-                logger.warning(f"Failed to unsubscribe from MQTT: {e}")
+        self._bin_collections.unsubscribe(logger, drivers)
 
-    def _on_database_updated(self, payload, drivers: Drivers):
-        """Thread-safe callback when database is updated via MQTT."""
-        logger.info("Database update notification received")
-        with self._cache_lock:
-            try:
-                self._update_outputs(drivers)
-                logger.debug("Cache refreshed after database update")
-            except Exception as e:
-                logger.error(f"Error refreshing cache: {e}", exc_info=True)
-
-
-    def handle_inputs(self, events: List[InputEvents], drivers: Drivers):
+    def handle_inputs(self, events: InputEvents, drivers: Drivers):
         # If we press both left and right, show the 'settings' screen
-        if InputEvents.LEFT_BUTTON_PRESSED in events and InputEvents.RIGHT_BUTTON_PRESSED in events:
+        if InputEvent.LEFT_BUTTON_PRESSED in events and InputEvent.RIGHT_BUTTON_PRESSED in events:
             logger.info("Left + Right buttons pressed, navigating to Settings")
             from hardware.screens.settings.settings import Settings
 
             return Settings()
 
-        if InputEvents.RIGHT_BUTTON_PRESSED in events:
+        if InputEvent.RIGHT_BUTTON_PRESSED in events:
             logger.info("Right button pressed, navigating to BinCollections")
             from hardware.screens.bins.bin_collections import BinCollections
 
             return BinCollections()
 
-        if InputEvents.BIN_1_PRESSED in events or InputEvents.BIN_2_PRESSED in events or InputEvents.BIN_3_PRESSED in events or InputEvents.BIN_4_PRESSED in events:
+        if events.contains_bin_press():
             logger.info("A bin button has been pressed")
             # If any bins are pressed, we need to see what the status of that bin is.
             # If it's actionable, 'prime' the bin!
 
-            first_button_event = next((e for e in events if e.is_bin_press()), None)
-
-            if first_button_event is None:
-                logger.warning("No bin press events found in events: " + str(events))
-                return None
-
-            logger.debug(f"Bin button {first_button_event} pressed, filtered from {len(events)}")
-
-            bin = first_button_event.get_bin()
+            bin = events.get_first_bin_press().get_bin()
 
             if bin is None:
                 logger.info("No bin found for button presses: " + str(events))
@@ -106,7 +70,7 @@ class Today(Screen):
             # Get the next collection for the bin that was pressed
 
             # Check if the bin is 'actionable'
-            next_collection = self._bin_explorer.get_next_collection_for_bin(bin.id)
+            next_collection = self._bin_collections.data.get_next_collection_for_bin(bin.id)
 
             if next_collection is None or next_collection.status != BinCollectionStatus.DUE_OUT:
                 logger.info(f"No upcoming collections found for bin '{bin.name}' (id={bin.id})")
@@ -128,7 +92,7 @@ class Today(Screen):
                             bin_id=bin.id,
                             date_put_out_at=datetime.datetime.now()
                         ))
-                    self._bin_explorer.load_data()
+                    self._bin_collections.data.load_data()
                 elif self._actively_confirming_bin_id is not None:
                     logger.info(f"Clearing active confirmation for bin id {self._actively_confirming_bin_id} since no actionable collection found")
                     self._actively_confirming_bin_id = None
@@ -143,6 +107,13 @@ class Today(Screen):
 
         return None
 
+    def tick(self, drivers) -> Screen | None | QuitApp:
+        if self._bin_collections.recently_updated:
+            logger.debug("Bin collection data recently updated, refreshing outputs")
+            self._update_outputs(drivers)
+
+        return None
+
     def _update_outputs(self, drivers: Drivers):
         """
         Update the display with bin collection data
@@ -152,10 +123,8 @@ class Today(Screen):
 
         logger.debug("Updating display with current bin collection data")
 
-        self._bin_explorer.load_data()
-
         # Get the next collections for each of the bins
-        next_collections = self._bin_explorer.get_next_collections_for_all_bins()
+        next_collections = self._bin_collections.data.get_next_collections_for_all_bins()
 
         # Handle no collections found in the future
         if self._actively_confirming_bin_id is not None:
@@ -169,6 +138,9 @@ class Today(Screen):
         else:
             self._show_upcoming_collections_lcd(next_collections, drivers)
             self._show_upcoming_collections_lights(next_collections, drivers)
+
+        self._bin_collections.mark_update_handled()
+
 
     def _show_no_collections_found(self, drivers: Drivers):
         logger.debug("No upcoming collections found")
@@ -197,7 +169,7 @@ class Today(Screen):
             out_in_text,
             "|".join([c.bin_name for c in bin_names_due_next]),
             drivers.lcd.TEXT_STYLE_CENTER,
-            suffix='>' if self._bin_explorer.has_collection_after(next_collection_at) is not None else None,
+            suffix='>' if self._bin_collections.data.has_collection_after(next_collection_at) is not None else None,
             )
 
 
